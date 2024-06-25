@@ -1,0 +1,353 @@
+/MongoDB and Promises/
+Intro...
+Here we are going to learn only the basics.
+1.  In this section, we learn how to connect nodejs app to a database to store user data.
+2.  We are going to start an app which is Task Manger application.
+3.  We are going to learn everything which is needed for development of an app.
+
+* MongoDB and NoSQL databases...
+Intro
+1.  We are going to learn about the database we will be using to store data (MongoDB).
+2.  For this, we are going to have an authentication, CRUD operations and lot more.
+
+MongoDB
+1.  Visit “mongodb.com” which is an open-source database we can install it on all types of machines.
+2.  We will use mongodb native driver to connect to database from nodejs to make CRUD operations with the data.
+3.  This falls under a category of NoSQL database (NoSQL stands for Not Only Structured Query Language).
+
+* comparison of SQL and NoSQL databases...
+SQl
+1.  data is stored in the tabular format.
+2.  individual items storage: row or a record
+3.  there are columns with different user properties (name, age, id, email)
+
+NoSQL
+1.  data is stored in the collection format
+2.  individual items storage: document (looks like JSON --- JSON representation)
+3.  there are fields (name, id, age, email)
+
+conclusion:
+1.  collection is a list of entries these entries are referred to as documents and these documents have many fields as we need.
+
+ex:
+collection inside mongodb
+[
+  {
+    "_id": "u124asfw13g"
+    "name": "u1",
+    "age": 32,
+    "email": "u1@user.com"
+  },
+  {...}
+]
+
+* Installation of mongodb on windows...
+  skipped
+* Installation of database GUI viewer... User interface to manage mongodb database and data it contains
+  skipped
+
+* Connecting and Inserting Documents...
+1.  create "task-manager" project directory   -> initialize npm with "npm init -y"  -> install mongodb with "npm i mongodb"
+2.  we have to perform CRUD operations (Create, Read, Update & Delete) to manage our data.
+3.  remaining process is inside "mongodb.js" file.
+
+->  learned how to insert data into a database using nodejs
+->  while inserting data a unique identifier (_id) was generated automatically
+
+explanation:
+->  installed MongoDB NPM library >>> native driver created by MongoDB company >>> allowing us to connect to mongodb database from nodeJS.
+->  connect method used to connect to specific server
+->  used db() method on the client to get connection to specific database
+
+* Inserting document...
+1.  insertOne used to insert single document into a collection
+2.  insertOne() is an asynchronous.
+3.  insertOne takes two arguments.
+insert data:
+->  1st argument >>> data
+  ->  collection.insertOne({ name: "John" })
+->  in above example we did not use callbacks but we can to handle errors
+
+handling errors:
+->  2nd argument >>> to handle errors
+  ->  collection.insertOne({ name: "John" }, (err, res) => {})
+->  callback takes two arguments error and result
+  ->  result.. if things went well
+    ->  result... contains information that is data we sent and as well as the unique-ID that assigned to the data we sent.
+  ->  as per API documentation... on result we have properties like "ops", "insertedId".
+    ->  ops... an array of documents that were inserted.
+    ->  insertedId... returns an ID that was assigned to the document that was inserted.
+->  handle the error and result using if block
+
+example:
+1.  on insertOne we can also use if-else to handle errors.
+
+2.  on insertOne we used .then and .catch to handle errors
+  collection.insertOne(data)
+  .then((result) => {
+    console.log('Data inserted successfully', result.insertedId)
+    client.close()
+  })
+  .catch((error) => {
+    console.error('error while inserting!', error);
+    client.close()
+  });
+
+* Inserting documents...
+1.  insertMany is used to insert more than 1 document a time.
+2.  this takes two arguments
+
+->  1st arg >>> an array of documents to insert
+->  2nd arg >>> callback function ()=>{}   -> to handle error and result.
+
+* The ObjectId...
+1.  what is the important role of Ids assigned to documents that were created.
+2.  the ids inside mongodb are GUIDs(Globally Unique Identifiers) designed by an algorithm.
+3.  like sql there will not be any Id collision inside mongodb database servers.
+4.  the server is not generating the Ids but the mongodb library
+
+->  generating new GUIDs on our own needs...
+1.  ObjectId from mongodb
+2.  constructor function... const id = new ObjectId();
+3.  print id to the console
+
+Note:
+GUID is a 12-byte ObjectId value consists...
+  4-byte -> represents seconds >>> timestamp when an ObjectId was created
+  5-byte -> random value
+  3-byte -> counter, starting with a random value
+
+4.  timestamp... clg(id.getTimestamp()) does not take any arguments
+->  gets the exact time when the GUID was created
+
+step-1: import the ObjectId from mongodb --- const ObjectID = mongodb.ObjectId
+step-2: use ObjectID constructor --- const id = new ObjectID("66312a9b4ac98d5e1d6165b6")
+
+object destructuring:
+method-1 >>>
+  const mongodb = require('mongodb')
+  const MongoClient = mongodb.MongoClient
+method-2 >>>
+  const { MongoClient } = require('mongodb')
+
+conclusion:
+->  we learned how to C - create in CRUD
+  // variable that represents a collection within a database
+    db.collection("tasks")
+      .insertMany([
+        {
+          name: "user-1",
+          task: "get milk",
+        },
+        {
+          name: "user-2",
+          task: "water plants",
+        },
+      ])
+      .then((result) => {
+        console.log(result.insertedCount);
+      })
+      .catch((error) => {
+        console.log("Unable to insert documents!", error);
+      });
+
+* Querying Documents - findOne and find...
+findOne:
+1.  "R" read a document by it's id or any other field
+2.  we can also fetch multiple documents using a specific subset (like when age===27)
+3.  we use two methods that are
+    ->  "find" to fetch multiple documents from a database (uses specific subset to group things)
+    ->  "findOne" to fetch single document
+4.  "findOne"... takes two arguments
+  ->  object:     to specify search criteria... search using a name or id or age or something that an object holds as a property key
+  ->  callback:   gets called when operation is completed... we either gets an error or data we search
+5.  searching for a doc and not finding it is not an error we get "null".
+6.  it will always returns 1st document if there are multiple documents with same search criteria.
+7.  if we want to search for an unique document then use it's GUID
+  ->  1st arg - findOne:  { _id: "66312a9b4ac98d5e1d6165b5" } this do not give any results.
+  ->  1st arg - findOne:  { _id: new ObjectId("66312a9b4ac98d5e1d6165b5") } we get the expected results.
+                                              /
+                here we can use the ObjectID constructor that was created and stored inside variable- Id
+                                            /
+                that is const id = new ObjectID("66312a9b4ac98d5e1d6165b6")
+
+find:
+1.  to find for multiple documents with the specified criteria as a Query object
+2.  "find" does not take any callback as the second argument
+3.  as the 1st argument we have to provide age or taskStatus if it is userData but not the ID (as we have to get bunch of results we should not pass ID as it is Unique we get a single value)
+
+->  we get "cursor" as the return value from the find
+  ->  cursor has methods we can use to manipulate the data popularly we use "toArray()" which gets back an array of documents
+    ->  toArray takes a callback function which either return an error or an array of results
+  ->  "count" which returns the count or number of elements in that result array
+
+ex:
+=> find --- finds many fields using a Query
+  db.collection('users').find({ age: {$gt: 10 } }).toArray()
+    .then((res) => {
+      console.log(res)
+    })
+    .catch((err) => {
+      console.log(err)
+    })
+
+=> findOne --- finds one user takes one arg _id
+  db.collection('users').findOne({ _id: new ObjectID("66312a9b4ac98d5e1d6165b6") }).toArray()
+    .then((res) => {
+      console.log(res)
+    })
+    .catch((err) => {
+      console.log(err)
+    })
+
+* Promises...
+const workOnPromise = new Promise((resolve, reject) => {
+  setTimeout(()=>{
+    // reject("something went wrong!")
+    // resolve(["some", "result", [1, 2, 3] ])
+  }, 2000)
+})
+
+workOnPromise
+.then((result) => {
+  console.log(result)
+})
+.catch((error) => {
+  console.log(error)
+})
+/*
+ * we do not create promises like this but they are created by the libraries we use in development
+ *
+ * Note:
+ * In promises, we can call either resolve or reject functions (we can't call both or can't call one function twice)
+ * Once one of them is called the value or state of promise can not change
+ * But with callback pattern we can call a callback twice that can be an error or a resolved result
+ *
+ *                            -> fulfilled (resolved)
+ *                          /
+ * promise --- pending --->
+ *                          \
+ *                             -> rejected
+ *
+ * our promise is pending for two seconds until either resolve or reject is executed
+ *  -> if resolve is called promise is fulfilled.
+ *  -> if reject is called promise is rejected.
+*/
+
+* Updating documents...
+we have
+  updateMany -> (to update many docs at a time)
+  updateOne -> (to update one doc)
+
+1.  updateOne...
+->  1st object is for filter by id or by any of its properties
+->  update the things what we wanted to do
+
+steps to be followed:
+->  1-arg:  an object that takes in target the object with its Id
+->  2-arg:  also an object... we do not update the field-values directly instead... we use update operators: "$set"(commonly used)
+
+$set allows us to set new value to already existing fields
+{
+  $set{
+    name: "Mike"
+  }
+}
+
+->  there are some other update operators in mongodb but most commonly used are: $set and $inc(to increment a value of the field)
+{
+  $inc{
+    age: 1 for increment or -1 for decrement
+  }
+}
+->  this whole returns a promise and to consume a promise
+  ->  we use .then() to get results if it is resolved and .catch() to handle the errors
+
+ex:
+db.collection('users').updateOne({_id: id}, {$set: {name: "user-3"}})
+  .then((data) => {
+    console.log(data)
+  })
+  .catch((error) => {
+    console.log(error)
+  })
+
+2.  updateMany...
+->  1-arg: takes an object to filter
+->  2-arg: takes another object with "$set" operator to update the values in that filtered field
+->  returns a promise and use .then() .catch() to handle the result and error respectively.
+ex:
+  db.collection('users').updateMany({completed: false}, {$set: {completed: true}})
+    .then((res) => {
+      console.log(res)
+    })
+    .catch((err) => {
+      console.log(err)
+    })
+
+* Deleting documents...
+->  we have two methods in mongodb that are deleteOne and deleteMany
+->  same as updateOne and updateMany the arguments are same for Deleting methods
+
+deleteMany:
+1-arg:  filter the field that need to be deleted
+->  this returns a promise and it need to be consumed
+ex:
+  db.collection('users').deleteMany({completed: false, name: "user-1"})
+    .then((res) => {
+      console.log(res)
+    })
+    .catch((err) => {
+      console.log(err)
+    })
+
+deleteOne:
+same code as deleteMany
+
+conclusion:
+->  Use deleteOne() when you want to delete a single document that matches certain criteria, and it's sufficient to delete only one document.
+->  Use deleteMany() when you want to delete multiple documents that match certain criteria, and you want to delete all of them.
+
+__________________________________________________________________________
+the total code will be:
+
+// ------------------------------------------ To perform CRUD operations
+/*
+  * short cut --- const { MongoClient, ObjectID } = require("mongodb");
+*/
+const mongodb = require('mongodb');
+const MongoClient = mongodb.MongoClient
+const ObjectID = mongodb.ObjectId
+
+// Require 'dotenv'
+require("dotenv").config();
+
+// define "connectionURL" of the database we are trying to connect to...
+const uri = process.env.MONGODB_URI;
+
+// set database name
+const databaseName = "task-manager";
+
+// ObjectID constructor
+const id = new ObjectID("663986424fb304f653a3ff07")
+
+// connect to mongodb atlas
+MongoClient.connect(uri)
+  .then((client) => {
+    console.log("connected to database!");
+
+    // accessing database through client.db()
+    const db = client.db(databaseName);
+
+    db.collection('users').find({ age: {$gt: 10 } }).toArray()
+    .then((res) => {
+      console.log(res)
+    })
+    .catch((err) => {
+      console.log(err)
+    })
+
+  })
+  .catch((error) => {
+    console.log("error in connecting!", error);
+  });

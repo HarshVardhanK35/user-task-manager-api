@@ -1,0 +1,46 @@
+user-task-manager-api(main-project-folder)/
+│   ├── app.js
+│   └── index.js
+
+├── package.json
+└── package-lock.json
+├── node_modules
+
+├── config/
+│   ├── dev.env
+│   └── test.env
+
+├── playground/
+│   ├── tests
+│         ├── math.js
+│         ├── math.test.js
+
+├── src/
+│   ├── db
+│         ├── mongoose.js
+
+│   ├── emails
+│         ├── account.js
+
+│   ├── middleware
+│         ├── auth.js
+
+│   ├── models
+│         ├── task.js
+│         └── user.js
+
+│   ├── routes
+│         ├── task.js
+│         └── user.js
+
+├── testing
+│   ├── task.test.js
+│   ├── user.test.js
+│   ├──  fixtures
+│         ├── user-avatar.jpg
+│         └── db.js
+│   ├── testing.txt
+
+├── text_docs
+
+Project Folder Structure

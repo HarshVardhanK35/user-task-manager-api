@@ -1,0 +1,401 @@
+* File Uploads (Task App)*
+---------------------------
+---------------------------
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+* Adding Support for File Uploads *
+-------------------------------------
+1. how we add support for file uploads for an express application?
+-----
+-> we are using "multer" the NPM library which manages the file uploads for an express application
+-> so far we have sent JSON data from client to server as request body and server has parsed that data into JS object
+
+1. installation-multer
+-----
+-> install "multer" in task-manager application
+  -> cd task-manager >>> "npm i multer"
+
+2. how we could add files to an express application >> we use index.js for simple upload example using multer
+-----
+const multer = require('multer')
+-> load in multer >>> import the module
+
+const upload = multer ({
+  dest: 'images'                        // dest >>> destination which is for destination folder
+})
+-> configure multer >>>   which type of data we want to send to the sever either it's a pdf or jpg or docx or docx
+...here we also set a folder-name for destination where we want to save the file we upload from POSTMAN
+
+app.post('/upload', upload.single('upload'), (req, res) => {
+  res.send()
+})
+-> here we gonna set a "POST" req to upload the files into the server
+-> takes in
+"path" ... 1
+"return value form middleware-function" ... 2     >>> return value form middleware function of multer library that takes a single argument
+"req handler" ... 3
+
+NOTE:
+-----
+-> for this moment we use POSTMAN to upload files after that we learn how to upload files from a browser
+
+about middleware function of multer
+-----
+-> as from the above example... we configured multer using "upload" so we use "single" method on it.
+-> this single takes in a single argument a string type we use "upload"
+
+Note:
+-----
+-> when we send a JSON as req body we use "Body" tab under the url-box -> "raw" select "JSON" -> and then we provide JSON data below
+-> but now we have to send files to the server so we use "form-data" under the "Body" tab
+
+example of real-time file uploading (TESTING)
+-----
+-> to upload a file use any text or images from your desktops
+-> open "POSTMAN" >>> create a new "POST" HTTP request >>> url: {localhost:3000/upload}
+-> hop on to form-data under body tab and there will be key-value pairs
+  -> the key value must be same as the argument that we had provided inside "upload.single()" middleware function
+-> key is "upload" and data must be file type select from the dropdown menu side to the key box
+-> value while change and it asks us to select the file from our machine
+
+check this:
+-----
+-> at last a folder on your "TESTING" directory will be created with name "images" (provided inside dest in configuration of multer)
+-> there will be a file added here inside images directory and it is of type- binary data (VS code can not open it until we specify the extension that must match the file we uploaded before)
+
+challenge:
+-----
+1. inside the working directory that is task-manager/ user-route... set an endpoint: users/me/avatar to upload an avatar using POSTMAN
+2. setup an avatar directory using multer to store uploaded file from postman
+3. set a name "avatar" inside multer middleware
+4. send a "200" response back on success >>> test your work.
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+* Validating File Uploads *
+----------------------------
+intro:
+-------
+1. restrict file by it's type and size
+2. two things 2 validate: file size and file type
+
+-> while configuration only we have to set the rules for uploading
+here... const upload = multer ({ dest: 'images' }) in here
+
+FileSize:
+---------
+-> here we have to set up another property that is "limits" which is an object
+const upload = multer ({
+  dest: 'images',
+  limits: {}
+})
+-> limits takes in different types "fileSize" takes in number in bytes (if megabytes then it is "millions")
+-> if file size exceeds more than the range of given limit then it throws a multerError
+
+FileType:
+---------
+fileFilter(req, file, cb) {
+  cb(new Error ('Please provide PDF file only'))
+}
+-> another function inside multer configure is "fileFilter" that accepts only some files with specified extensions
+
+-> takes in 3 args
+1. req >>>    express request that we made
+----------
+
+2. file >>>   takes the file type that need to be accepted
+-----------
+-> all the file details are here inside file that is 2nd arg
+-> there are different properties accessible on 2nd arg... we use "originalname" to get the name of the file
+
+
+3. cb >>>     callback... used to tell multer that we are done with filtering the file
+---------
+//... i.  cb(new Error('File must be of PDF type!')) ... // --- // error callback
+-> i.   if any error occurred we simply pass that to callback function
+
+//... ii. cb(undefined, true) ...// --- // this is passed on if there is no error
+-> ii.  undefined... no error and take the file into server and proceed
+
+snippet to check the "pdf" type:
+---------------------------------
+const upload = multer({
+  dest: 'filesFromServer',
+  limits: {
+    fileSize: 100000000000 // given 1 million.. does not take files more than 1MB
+  },
+  fileFilter(req, file, cb){
+    if(!file.originalname.endsWith('.pdf')){
+      cb(new Error("Upload files only of PDF type!"))
+    }
+    cb(undefined, true)
+  }
+})
+app.post('/upload', upload.single('upload'), (req, res) => {
+  res.send()
+})
+
+challenge:
+----------
+1. limit the upload size to 1 MB
+2. condition only "jpg" or "jpeg" or "png" types
+3. test the work!
+  3.1 upload larger than 1 MB File
+  3.2 upload files with extensions other than specified extensions
+
+snippet to check the "jpg" or "jpeg" or "png" type:
+---------------------------------------------------
+// file uploads
+const avatar = multer({
+  dest: 'avatars',
+  limits: {
+    fileSize: 1000000 // accepts files with less than or equal to 1 MB
+  },
+  fileFilter (req, file, cb) {
+    const fileExt = file.filename
+    if (fileExt.endsWith('jpg') || fileExt.endsWith('jpeg') || fileExt.endsWith('png')) {
+      cb(null, true)    // accept the file
+    }
+    cb(new Error("Please upload correct file"))   // rejects the file
+  }
+})
+// router to access file-uploads
+router.post('/users/me/avatar', avatar.single('avatar'), (req, res) => {
+  res.send()
+})
+
+
+//  ---------------------------- HELPFUL RESOURCES ----------------------------
+Note:
+1. to practice with regular expressions use the website: "regex101.com"
+2. jsbin --- webpage to practice JS
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+* Handling Express Errors *
+----------------------------
+intro:
+-------
+-> all this is about not to send a full clumsy HTML response when an error occurred...
+ -> updating the code with just a function which sends JSON response with error object (this error object has error message)... with status code of 400
+-> at the end of the request handler in post request we pass another function which handles Error
+
+// using Multer to upload files to server
+const upload = multer({
+ dest: 'filesFromServer',
+ limits: {
+  fileSize: 100000000000 // given 1 million.. does not take files more than 1MB
+ },
+ fileFilter(req, file, cb){
+  if(!file.originalname.endsWith('.pdf')){
+   cb(new Error("Upload files only of PDF type!"))
+  }
+  cb(undefined, true)
+ }
+})
+
+// POST request to send files to server
+app.post('/upload', upload.single('upload'), (req, res) => {
+ res.send()
+}, (error, req, res, next) => {
+ res.status(400).send({ error: error.message })
+})
+
+explanation:
+------------
+1. after request handler we provide another function that handles error... if any
+2. it must be provided with all 4 arguments that are: (error, req, res, next)
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+* Handling Express Errors *
+----------------------------
+intro:
+-----
+
+1st... providing authentication to avatars request:
+------
+-> adding auth... accepting profile pics... request handler and error handler inside post - route with path: 'user/me/avatar'
+
+2nd... where exactly we store the profile picture / avatar:
+------
+-> instead of storing those avatars on present working directory or file system
+ -> we add a new field on user-model to store the image as binary data
+-> to process this we add a new field on to user-model that is...
+ -> avatar: { type: Buffer } (Buffer with capital "B")
+
+Note:
+-----
+-> no need of validation as multer taken care of it and it is an optional field so no need of "required: true" on that field.
+
+2.1 how can we access the file that we sent inside route handler of post-route (/users/me/avatar)
+------
+-> the route handler (req, res) => {} does not get access to the file that we had uploaded
+ -> cause we have used multer in between so it processes the image and saves to the directory we have provided (dest: "uploads")
+
+snippet:
+---------
+const avatar = multer({
+ dest: 'avatars', // this saves the data instead of sending it to request handler
+ limits: {
+  fileSize: 1000000
+ }
+})
+
+-> so remove the "dest: < directory-path-to-save-uploads >" line... now multer is no longer save the uploads
+-> the file uploads are accessible through the request body object
+ -> "req.file.buffer" >>> contains a buffer of all binary data
+-> save uploads to user-model: without saving it to the file-system we save it to the user model
+ -> "req.user.avatar = req.file.buffer"
+ -> at last save the user which returns a promise so use await on it
+ -> await req.user.save()
+
+
+problem!
+realized afterwards that it is not a problem so the below one is OPTIONAL
+---------
+-> but multer does not store the file as buffer type into the user-model... even the code written accepts the file uploads
+-> so ensure that storage option with multer was configured correctly
+
+snippet:
+--------
+const multer = require("multer")
+const storage = multer.memoryStorage();
+const avatar = multer({
+ storage: storage,
+ limits: {}... remaining code
+})
+
+3rd... how to render (using HTML templates) the image which was Uploaded to server that has buffer data
+------
+-> use image tag <img='data:image/jpg;base64, {the copied buffer-data}'>
+-> to view the preview of the image uploaded
+
+challenge:
+----------
+1. setup DELETE route >>> /users/me/avatar
+2. add authentication
+3. set the field to undefined and save the user and set the status to 200
+4. test the work!
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+* Serving up Uploaded file with multer *
+-----------------------------------------
+intro:
+-------
+1. so up to now we learnt how to upload an avatar for users
+2. in this we learn how to view that avatar using an express route
+
+snippet:
+--------
+// GET- request to view user-avatar
+router.get('/users/:id/avatar', async (req, res) => {
+ const user = await User.findById(req.params.id)
+ try{
+  if(!user || !user.avatar){
+   throw new Error()
+  }
+  res.set('Content-Type', user.avatarMimeType) // dynamically set the content type
+  res.send(user.avatar)
+ }
+ catch(err){
+  res.status(404).send()
+ }
+})
+
+explanation:
+-------------
+-> we use GET request
+ -> router.get('/users/:id/avatar', (req, res) => {})
+-> we fetch the user 1st with his user-id (_id) provided in the URL
+ -> with User.findByID(req.params.id)
+-> condition to check the user and avatar exits on that user or not with try{} catch(err) {}
+-> if runs well... we send correct data and what type of data we are sending to the client
+ -> which type of data we are returning is done by setting response headers
+ -> res.set('', '')
+  -> response headers takes in key-value pairs that is
+   -> key will be "Content-Type" which content we are sending back and the value will be 'images/jpeg' as we are sending the images
+-> changed to the dynamic Content-Type
+ -> res.set('Content-Type', user.avatarMimeType) // dynamically set the content type
+Note:
+-----
+-> when we are sending a JSON as a response express takes care of it automatically
+-> ex: 'Content-Type', 'application/json'
+
+additional:
+-----------
+avatarMimeType:{
+ type: String
+}
+---
+-> i have set the 'Content-Type' to dynamic type of images uploaded
+-> added a new field to the user-model
+
+req.user.avatarMimeType = req.file.mimetype // store the MIME type of the uploaded image
+---
+-> so while uploading the image to DB... we also setting the type of the image to 'avatarMimeType' in the DB
+-> inside router.post('/users/me/avatar') route
+
+router.delete('/users/me/avatar', auth, async (req, res) => {
+ try{
+  req.user.avatar = undefined;
+  req.user.avatarMimeType = undefined
+  await req.user.save()
+  res.send({ message: "User avatar deleted successfully" })
+ } catch (err) {}
+})
+---
+-> updated the delete route too...
+ -> router.delete('/users/me/avatar')
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+* Auto-Cropping and Image Formatting *
+--------------------------------------
+intro:
+-------
+1. we use NPM module "sharp" to format the images before we upload them to server
+2. with this module:
+  -> we reduce images to specified size
+  -> with the help of this... we can store our images with a common format
+  (if someone provides jpeg or jpg we convert them into png with this module)
+3. install sharp and load / import into the working file
+  -> npm i sharp >>> const sharp = require('sharp')
+Note:
+-----
+-> sharp uses lot of libraries behind the scene to work the process we instructed it to
+
+snippet:
+---------
+Updated POST user-profile avatar route:
+---------------------------------------
+// router to access file-uploads >>> route to upload avatar for users
+router.post('/users/me/avatar', auth, avatar.single('avatar'), async (req, res) => {
+
+  const buffer = await sharp(req.file.buffer).resize({ width: 150, height: 150 }).png().toBuffer()        // modified-line
+
+  req.user.avatar = buffer                                 // we save the buffer data on user avatar of user-model (added extra field in user-modal that is... { avatar: Buffer }
+  req.user.avatarMimeType = req.file.mimetype
+  await req.user.save()
+  console.log(req.file.buffer.length);
+  res.send("successfully uploaded profile avatar")
+}, (error, req, res, next) => {
+  res.status(400).send({ error: error.message })
+})
+
+-> we have to use async-await on sharp methods as they returns promises
+-> we are going to work on the user-route directory and the route (/users/me/avatar) which is used to upload avatar into the DB
+-> as now we are working on the server side... there is no option for users to use plugins/GUI to crop images that could only be possible on client-side
+  -> so we are using .resize()... this takes in an object consists of width and height properties >>> { width: 250, height: 250 }
+-> we use .png() a method to convert the provided images to a common png format...
+
+> > > const buffer = await sharp(req.file.buffer).resize({ width: 150, height: 150 }).png()
+------
+-> the above code returns an intermediate representation of the image processing pipeline in the form of a Sharp object.
+-> so we use .toBuffer() to change it into buffer data
+-> from initially we have been storing image data as buffer type inside the database
+
+What is Buffer?
+----------------
+-> A buffer in Node.js is a temporary storage area for binary data.
+
+Due to these modifications updates in other routes?
+-----------------------------------------------------
+-> res.set('Content-Type', 'image/png');
+-> update this line inside... get user-profile avatar... router.get('/users/:id/avatar')

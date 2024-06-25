@@ -1,0 +1,225 @@
+Section --- Sorting, Pagination and Filtering
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+Working With Timestamps
+------------------------
+1. add 2 new fields that are "createdAt" and "updatedAt" these are going to store timestamps
+  -> the time when task and user were updated; when user was signed-up and task was created
+2. to enable new data fields we have to customize the schema
+
+steps to customize user-schema
+--------------------------------
+1. mongoose.Schema for user can take two args and one is an object that was already provided
+  -> and the other is Schema-options which is timestamps an object-type
+2. const userSchema = new mongoose.Schema({user-model}, {timestamps: true})
+  -> default timestamps are set to false and we enable them to true
+
+Note
+-----
+-> by this little modification the fields get automatically added to the user created on database
+-> these are useful on the server and the client can also use while rendering content to the browser
+
+challenge:
+-----------
+1. we have written the code that directly takes an object for modelling tasks
+
+-> so create a separate schema and include on to the task-model
+-> set timestamps as an option
+-> create tasks on postman to test the work!
+
+snippet:
+---------
+const mongoose = require("mongoose");
+const taskSchema = new mongoose.Schema({
+    description: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    completed: {
+      type: Boolean,
+      default: false,
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      ref: "User"
+    }
+},{
+    timestamps: true
+  }
+)
+const Task = mongoose.model('Task', taskSchema)
+module.exports = Task;
+
+conclusion:
+-----------
+1. timestamps: this could be useful for Sorting, Pagination etc., that our application needs
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+* Filtering Data *
+--------------------
+intro:
+-------
+1. for this and next couple of sections we focus on the GET /tasks route cause it is only the route which sends the data in array
+2. to get the necessary data for the user... we use query string as part of URL structure
+  -> URL will be like: {localhost:3000/tasks?completed=true}
+
+3. in the code we are checking for 3 conditions those are
+  -> when "query" is true... returns all the tasks which were completed
+  -> when "query" is false... returns all the tasks which were not completed
+  -> when "query" is not-defined (undefined)... returns all the tasks wether completed or not
+
+4. there is another condition when the query is not equal to "true" and "false" and "undefined"
+  -> then this returns "Bad request"
+
+// GET /tasks?completed=queryString
+-------------------------------------
+router.get('/tasks', auth, async (req, res) => {
+  const query = req.query.completed
+  if (query !== 'true' && query !== 'false' && query === undefined) {
+    return res.status(400).send("Bad Request: 'completed' query parameter must be 'true' or 'false'");
+  }
+  const match = {};
+  if (query === 'true' || 'false') {
+    match.completed = (query === 'true') ? true : false
+  }
+  try {
+    const tasks = await Task.find(query ? { ...match, createdBy: req.user._id } : { createdBy: req.user._id });
+    res.send(tasks);
+  } catch (err) {
+    res.status(404).send("Tasks not found!");
+  }
+});
+
+explanation:
+-------------
+1. as query value will be String-type... need to be converted into boolean:
+.....................
+const match = {};
+if (query === 'true' || 'false') {
+  match.completed = (query === 'true') ? true : false
+}
+-> took an empty object... and checking for query value if it is "true" (type: String) then match.completed = true (type: Boolean)
+
+2. checking that query has provided or not:
+---------------------------------------------
+-> if provided returns according to query value
+-> if not returns every tasks
+...................
+try {
+  const tasks = await Task.find(query ? { ...match, createdBy: req.user._id } : { createdBy: req.user._id });
+  res.send(tasks);
+}
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+* Pagination In Database *
+--------------------------
+intro:
+------
+Pagination >>> Pages contains data
+1. we need a way for people requesting their tasks to specify which page of data they are trying to fetch
+  -> we gonna do that by setting up new options for their requests those are the two options we are going to enable to support pagination.
+2. two options: "limit" and "skip" >>> both are number Types
+
+what are limit and skip?
+------------------------
+-> both limit and skip are used for pagination... these manage large sets of data by breaking them into manageable chunks
+
+
+Limit:
+------
+-> takes number and specify max number of records in a single response... this controls the dataset returned by the server
+ex:
+---- If you set limit=10, the server will return 10 records.
+
+Skip:
+------
+-> specifies the number of records to skip before starting to return records.
+
+How to use both limit and skip:
+-------------------------------
+-> this modification is done on Task GET /tasks route
+-> assume that we set 10 as limit of responses for pagination and we set skip as 10
+  -> then this returns next 20 that is the response starts from 11 and skips 1st 10 results that is (1 to 10)
+ex-1
+---- "url/tasks?limit=10&skip=0"
+-> if we set limit as 10 and skip as 0 then the response of pages starts from 1 onwards
+
+ex-2
+----- "url/tasks?limit=10&skip=10"
+-> if we set limit as 10 and skip as 10 then the response of pages starts from 11 onwards and skips 1st 10 pages
+
+-> on find method we have limit and skip methods
+  -> mongooseModel.find({query}).limit(req.query.limit).skip(req.query.skip)
+snippet:
+---------
+router.get('/tasks', auth, async (req, res) => {
+  const query = req.query.completed;
+  if (query !== 'true' && query !== 'false' && query !== undefined) {
+    return res.status(400).send("Bad Request: 'completed' query parameter must be 'true' or 'false'");
+  }
+  const match = {};
+  const limit = parseInt(req.query.limit) || 5;
+  const skip = parseInt(req.query.skip) || 0;
+  if (query !== undefined) {
+    match.completed = (query === 'true') ? true : false
+  }
+  try {
+    const tasks = await Task.find(
+      query ?
+      { ...match, createdBy: req.user._id } : { createdBy: req.user._id }
+    )
+    .limit(limit)
+    .skip(skip)
+    res.send(tasks);
+  } catch (err) {
+    res.status(500).send("Internal Server Error");
+  }
+});
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+* Sorting Data *
+-----------------
+intro:
+------
+1. this modification is done on Task GET /tasks route
+2. sorting types
+  2.1 we use timestamps to know when a task was created or updated.
+  2.2 sort by complete and incomplete
+
+2.1 sorting data in ascending or descending order
+--------------------------------------------------
+-> we use createdAt and updatedAt timestamps with ascending or descending order
+the URL structure:
+------------------
+-> localhost:3000/tasks?sortBy=createdAt_asc (or) localhost:3000/tasks?sortBy=createdAt_desc
+  -> we used (_) to separate "createdAt" and "asc" or "desc"
+
+Hardcoded way:
+---------------
+-> hardcoded way is specifying the asc and desc with 1 and -1 respectively
+-> const tasks = await Task.find({ query }).sort(createdAt: -1)               // descending
+
+using URL:
+----------- the URL is -> localhost:3000/tasks?sortBy=createdAt_asc
+-> we have to write code to use value provided inside URL
+
+-> as we did before with match we repeat the same with sort
+
+const sort = {};
+if (req.query.sortBy) {
+  const urlParts = req.query.sortBy.split('_')
+  sort[urlParts[0]] = urlParts[1] === 'asc' ? 1 : -1
+}
+try {
+  const tasks = await Task.find(
+  req.query.completed ?
+    { ...match, createdBy: req.user._id } : { createdBy: req.user._id }
+  )
+  .limit(limit)
+  .skip(skip)
+  .sort(sort)
+  res.send(tasks);
+}
+catch(err){ res.send(err) }

@@ -1,0 +1,19 @@
+* Heroku Deployment *
+----------------------
+1. commands to run to deploy application on Heroku:
+-----
+-> creates an application Heroku server
+  >>> heroku create var-task-manager
+-> before we push code to heroku we set up the environment variables as "key=value" (key-value pairs)
+  >>> heroku config:set key=value
+-> to remove set of key-value pairs we use unset and followed by only "key"
+  >>> heroku config:unset key
+-> now use "git push heroku master" to push the code on heroku
+
+Note:
+-----
+-> if we want to set mongodb_url a connection string as an env variable... for heroku
+-> as the connection string consists of special characters -> so we have to use double quotes for windows and single quotes for mac or linux to wrap the entire string into that
+  >>> heroku config:set MONGODB_URL="<connection_string>"
+-> no need to set the port for connection... it is maintained by heroku
+________________________________________________________________________________________________________________________________________________________________________________________________________________

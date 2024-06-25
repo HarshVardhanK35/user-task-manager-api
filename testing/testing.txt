@@ -1,0 +1,919 @@
+* JEST Testing Framework *
+---------------------------
+intro:
+------
+1. what tools we have to use for testing
+2. why testing is necessary >>> writing test cases to automatically verify that project is always working as expected
+
+testing frameworks:
+-------------------
+1. jestjs.io
+2. mochajs.org
+
+jestjs.io
+----------
+-> we are going to use jest as testing framework for testing task-manager app
+-> install jest as dev dependency inside task-manager app
+  >>> npm i jest --save-dev
+
+-> modify the scripts inside package.json
+  >>> "test": "jest"
+-> add this above line into the scripts
+
+-> create a folder inside app for all the test cases
+-> inside this create some files to write test cases
+
+-> jest only looks up on the files ending with <filename>.test.js
+-> after writing the cases run the command
+  >>> "npm test"
+
+snippet:
+--------
+test('hello world!', () => {
+
+})
+
+-> test() >>> global function that test suite provides us
+-> test()
+  -> this takes in a string that is the name of the test case
+  -> 2nd is the code that runs to check something passes or not
+
+why testing?
+------------
+-> saves time
+-> creates reliable software
+-> gives flexibility to developers
+  - refactoring
+  - collaborating
+  - profiling
+_____________________________________________________________________________________________________________________________________________________
+
+* Writing Tests and Assertions *
+----------------------------------
+1.
+-> an example was taken and written a test case on it.
+
+example:
+--------
+-> created a "math.js" file inside "src" directory
+-> that has a function calculateTip function which takes two args >>> total and tip percentage
+snippet:
+--------
+const calculateTip = (bill, tipPercent) => {
+  const total = bill * tipPercent
+  return bill + total;
+}
+module.exports = {
+  calculateTip
+}
+-> which calculates tip on given arguments
+-> this need to be tested
+
+test-script:
+------------
+const { calculateTip } = require("../src/math")
+test('should calculate total with tip', () => {
+  const checkTotal = calculateTip(10, 0.3)
+  if (checkTotal !== 13) {
+    throw new Error(`Total must be 13 but got ${checkTotal}`)
+  }
+})
+-> if the condition has not passed we throw a new error
+
+
+Assertions:
+------------
+-> in the above case there are only three lines of code to check a small code
+-> but some codes need a several lines of test code so we have assertion library with Jest that has set of functions and methods we can use
+
+-> we have to use "expect" library is used to replace the "if-condition" inside the above test case
+  >>> expect(checkTotal).toBe(13)
+-> this single line of code replaces if-condition inside the test-case
+
+modified:
+----------
+const { calculateTip } = require("../src/math")
+test('should calculate total with tip', () => {
+  const checkTotal = calculateTip(10, 0.3)
+  expect(checkTotal).toBe(13)
+})
+
+-> expect(checkTotal).toBe(13)
+  -> we can read this line in simple english that >>> "expect checkTotal to be 13"
+-> if checkTotal expected result is 13 then it does not return error but if it false it returns an error
+
+Note:
+------
+1. read the docs inside "jestjs.io" to use several assertions >> there are lot of useful features available... but we use most basic one that is ".toBe()"
+
+another test case with default arguments:
+-----------------------------------------
+snippet:
+--------
+const calculateTip = (bill, tipPercent = 0.2) => {
+  const total = bill * tipPercent
+  return bill + total;
+}
+module.exports = {
+  calculateTip
+}
+
+test-suite:
+-----------
+test('should calculate total with default tip', () => {
+  const checkTotal = calculateTip(10)
+  expect(checkTotal).toBe(12)
+})
+_____________________________________________________________________________________________________________________________________________________
+
+* Writing Own Test Cases *
+---------------------------
+1. now we write our own test cases for temperature conversion functions
+
+snippets:
+---------
+test('should calculate celsius from fahrenheit', () => {
+  const checkTemp = fahrenheitToCelsius(32)
+  expect(checkTemp).toBe(0)
+
+})
+
+test('should calculate fahrenheit from celsius', () => {
+  const checkTemp = celsiusToFahrenheit(0)
+  expect(checkTemp).toBe(32)
+})
+
+_____________________________________________________________________________________________________________________________________________________
+
+* Testing Asynchronous Code *
+------------------------------
+1. change the "scripts" inside package.json to automatically run the test script on changes
+  -> it is "test": "jest --watch"
+
+-> to check the Asynchronous ability with the Jest... we pass "expect(1).toBe(2)"
+  -> as this returns error and test cases fail
+-> so we pass this "expect(1).toBe(2)" into Asynchronous... setTimeout function
+
+snippet:
+--------
+test("testing asynchronous code", () => {
+  setTimeout(()=> {
+    expect(1).toBe(2)
+  }, 2000)
+})
+-> after running the above snippet... we got no errors and test cases passed successfully (even  there is wrong in the code)
+
+Problem:
+--------
+-> as Jest did not know the code contains asynchronous function
+-> the test has completed fast without waiting for the setTimeout to complete fully
+
+Solution:
+---------
+-> to add extra code so that jest knows the code contains asynchronous code
+-> pass a parameter to the function inside test... I have passed "executed" and this must be called after the asynchronous function
+
+-> so the test will not be completed until unless the asynchronous function executed
+snippet:
+--------
+test("testing asynchronous code", (executed) => {
+  setTimeout(()=> {
+    expect(1).toBe(2)
+    executed()
+  }, 2000)
+})
+-> now if we run the snippet the test execution waits for 2 seconds and completed only after the asynchronous function runs
+
+
+2. testing promises
+--------------------
+const add1 = (a, b) => {
+  return new Promise((res, rej) => {
+    setTimeout(() => {
+      if(a < 0 || b < 0) {
+        return rej("Numbers must be positive")
+      }
+      res(a + b)
+    }, 2000)
+  })
+}
+-> This returns a promise and how we can test the promises
+
+2.1 we can use the parameter way to test
+2.2 we can use async-await
+
+2.1 parameter-method
+--------------------
+test('Must add two numbers', (executed) => {
+  add(2, 3)
+  .then((sum) => {
+    expect(sum).toBe(5)
+    executed()
+  })
+})
+
+2.2 using async-await
+---------------------
+test('should add two numbers async/await', async () => {
+  const sum = await add(1, 1)
+  expect(sum).toBe(2)
+})
+_____________________________________________________________________________________________________________________________________________________
+
+* Testing Express Application: Part-1 *
+---------------------------------------
+intro:
+------
+1. here we set up configuration for jest to test the cases inside main application.
+
+-> before testing the code used for the application... as the application depends on environment variables
+ -> while executing the dev-code we configured the package.json with "dev.env" file...
+  -> so in the same way we provide same env variables to jest for testing environment
+-> we provide every env variables except the mongodb-database URL... coz testing data disturbs the actual data inside main database
+
+-> so now we configure the "test" script inside the package.json and set the test.env to use the test-environment variables
+ -> "test": "env-cmd ./test.env jest --watch" (updated)
+
+-> add configuration for "jest" too inside package.json
+test: {
+  "testEnvironment": "node"
+},
+-> this is under the scripts object
+
+-> here by this configuration we can use "node" environment to execute our test cases
+-> need more details on jest and it's configuration >>> visit: "jest.com/docs" -> API reference -> Configure Jest
+_____________________________________________________________________________________________________________________________________________________
+
+* Testing Express Application: Part-2 *
+----------------------------------------
+intro:
+------
+1. we have to test endpoints using jest >>> there are 2 ways
+ -> run the express sever on port: 3000
+ -> supertest... an express library to test the express server
+
+superTest installation:
+-----------------------
+-> install superTest as dev dependency: npm i supertest --save-dev
+
+Test the application:
+----------------------
+-> create a "user.test.js" inside testing directory
+-> now we require the installed package that is "supertest"
+-> now we require express application without app.listen() >>> that is impossible... so we refactor the main task-manager application
+ -> create another file "app.js" inside root folder and copy the entire code inside index.js except app.listen() and port... now paste the copied code inside the app.js
+
+The Refactoring must look like this:
+------------------------------------
+index.js:
+---------
+const app = require('./app')
+const port = process.env.PORT
+
+// listen to the port: 3000
+app.listen(port, () => {
+ console.log(`Server up and listening on https://localhost:${port}`)
+})
+
+app.js:
+-------
+// import express
+const express = require('express');
+
+require('./db/mongoose')
+const userRouter = require('./routes/user');
+const taskRouter = require('./routes/task');
+const app = express()
+
+// middleware functions --- to send a response that "site is under maintenance"
+// app.use((req, res, next) => {
+// res.status(503).send("site is under maintenance... check back soon!")
+// })
+
+// middleware - to parse the incoming JSON
+app.use(express.json())
+
+// middleware - to use routes
+app.use(userRouter)
+
+// middleware - to task routes
+app.use(taskRouter)
+module.exports = app
+
+Note:
+-----
+-> now we can use the code inside app.js without any need to listen "app" or need to call "app.listen()"
+-> now we can use index.js for development mode and app.js for testing
+-----
+
+1. import "superTest" as 'request' into "user.test.js" file
+2. import "app.js" inside testing file that is "user.test.js" file without 'app.listen()'
+3. as superTest returns promises so we have to use async/await on that
+
+snippet:
+--------
+// test-suite to check the sign-up
+test('Should sign-up a new user', async () => {
+ await request(app).post('/users').send(
+   {
+    name: "name",
+    email: "name@email.com",
+    password: "name@test.123"
+   }
+ ).expect(201)
+})
+
+explanation:
+------------
+-> here "await request(app).post('/users').send({ user-object-model })"
+ -> we have to use HTML-request post as it is creating a new user by sending user-model
+-> now we have to assert (means test) the status code on post-request
+ -> so we are expecting "201" on the post request
+
+Note:
+-----
+-> here we are testing the status code only
+-> whenever we test the application we have to start with the clean database that we will learn in next topic
+_____________________________________________________________________________________________________________________________________________________
+
+* Jest Setup and Teardown *
+---------------------------
+intro:
+------
+1. In this we learn how to use Jest Lifecycle Methods to run a code before and after a test case
+2. This allows us to clear the database for execution of test cases
+
+-> "beforeEach" and "afterEach" are the functions that are provided by Jest which are available globally
+  -> for this project we do not need "afterEach"
+
+steps:
+------
+-> so we use "beforeEach" to clear all of the users in the database so we need user-model
+
+snippet:
+--------
+beforeEach(async () => {
+  await User.deleteMany()
+})
+-------------------------------------------------------------------------------------
+
+-> there are other cases that tests login request
+  -> in that case there must be a very specific data inside a database
+    -> for this we need to create and save a user
+-> after creating User.. we have to save that User after deleting every other user (except the dummy-user we created just now)
+
+// create a dummy-user
+const userOne = {
+  name: "dummy",
+  email: "dummy@fake.com",
+  password: "DB.dummy@111"
+}
+
+// before every request
+beforeEach(async () => {
+  await User.deleteMany()
+  const user = new User(userOne)
+  await user.save()
+})
+-------------------------------------------------------------------------------------
+
+// test case - login existing user
+test('should login existing user', async() => {
+  await request(app).post('/users/login').send(
+    {
+      email: userOne.email,
+      password: userOne.password
+    }
+  ).expect(200)
+})
+
+// test case - should not login with bad credentials
+test('should not login with bad credentials', async () => {
+  await request(app).post('/users/login').send(
+    {
+      email: userOne.email,
+      password: 'Hello.Bad@111'
+    }
+  ).expect(400)
+})
+_____________________________________________________________________________________________________________________________________________________
+
+* Testing with Authentication *
+--------------------------------
+intro:
+------
+1. In this we learn to test an endpoint that requires authentication. (such as endpoint for creating a profile and deleting and closing account)
+2. to check the authentication we need to set an Id property on to the user-object and a JWT(JSON WEB TOKEN)
+  -> so that we can use this JWT to test authentication
+
+steps:
+------
+1. import JWT (to generate Json Web Token) and mongoose(to create an Id for user)
+-> const jwt = require('jsonwebtoken')
+-> const mongoose = require('mongoose')
+
+2. generate a new user Id and use this inside User-Object
+// create an Id for user
+const userId = new mongoose.Types.ObjectId()
+
+const userOne = {
+  _id: userId,                      // used the id here
+  name: "dummy",
+  email: "dummy@fake.com",
+  password: "DB.dummy@111",
+
+  // 3. generate a token for dummy-user to test authentication
+
+  tokens: [{
+    token: jwt.sign( {_id: userId}, process.env.JWT_SECRET_STR )
+  }]
+}
+
+Test-snippets:
+--------------
+// test authentication for user-login
+test('Should get user-profile', async () => {
+  await request(app)
+  .get('/users/me')
+  .set('Authorization', `Bearer ${userOne.tokens[0].token}`)
+  .send()
+  .expect(200)
+})
+
+// test delete an account of an authorized user
+test('should delete an account of user', async () => {
+  await request(app)
+  .delete('/users/me')
+  .set('Authorization', `Bearer ${userOne.tokens[0].token}`)
+  .send()
+  .expect(200)
+})
+_____________________________________________________________________________________________________________________________________________________
+
+* Advanced Assertions *
+-----------------------
+intro:
+------
+1. until now we made assertions for HTTP status codes
+2. now we assert the response body
+
+3. ideas to assert
+  1. assert that the database was changed correctly
+  2. assertions about the response
+
+
+3.1 assert that the database was changed correctly
+-----
+const user = await User.findById(response.body.user._id)
+
+-> if there is a user it will not return null >>> "expect(user).not.toBeNull()"
+-> this assertion confirms that we saved user to DB and the user-response is not null
+
+assertions with objects
+-----------------------
+-> without using expect().toBe() that takes every property... that is we need to pass every user property
+-> so we can use another assertion for objects
+
+// assert about the response
+expect(response.body).toMatchObject({
+  user:{
+    name: "user-1",
+    email: "user.1@email.com"
+  },
+  tokens: [{
+    token: user.tokens[0].token
+  }]
+})
+
+-> as the passwords are not stored as plain passwords as they are hashed... we have to check that they are not plain
+expect(user.password).not.toBe('passwordGivenWhileSignUp')
+
+-> above test case snippets
+// test-case: to signup a user
+test('should signup a user', async () => {
+  const response = await request(app).post('/users').send(
+    {
+      name: "user-1",
+      email: "user.1@email.com",
+      password: "user-1.111"
+    }
+  ).expect(200)
+
+  // Assert that the DB was changed correctly
+  const user = await User.findById(response.body.user._id)
+  expect(user).not.toBeNull()
+
+  // assert about the response
+  expect(response.body).toMatchObject({
+    user:{
+      name: "user-1",
+      email: "user.1@email.com"
+    },
+    tokens: [{
+      token: user.tokens[0].token
+    }]
+  })
+})
+
+Challenge-1
+-----------
+1. fetch user from the database
+2. assert token in response matches users second token
+3. test
+
+// validate new token is saved
+const user = await new User.findById(userId)
+expect(response.body.token).toBe(user.tokens[1].token)
+
+// test case - login existing user
+test('should login existing user', async() => {
+  const response = await request(app).post('/users/login').send(
+    {
+      email: userOne.email,
+      password: userOne.password
+    }
+  ).expect(200)
+
+  // validate new token is saved
+  const user = await new User.findById(userId)
+  expect(response.body.token).toBe(user.tokens[1].token)
+})
+
+Challenge-2:
+------------
+-> after deletion of user from database we get null as a response
+1. fetch user from database
+2. assert null response
+3. test
+
+// validate user is removed
+const user = await User.findById(userId)
+expect(user).toBeNull()
+
+// test delete an account of an authorized user
+test('should delete an account of user', async () => {
+  await request(app)
+  .delete('/users/me')
+  .set('Authorization', `Bearer ${userOne.tokens[0].token}`)
+  .send()
+  .expect(200)
+
+  // validate user is removed
+  const user = await User.findById(userId)
+  expect(user).toBeNull()
+})
+_____________________________________________________________________________________________________________________________________________________
+
+* Mocking Libraries *
+---------------------
+intro:
+------
+1. Goal here is how to NPM modules
+
+Mocking:
+--------
+-> The process od replacing real functions that run with the functions that we create (when we are running in a test env)
+
+Why Mocking?
+------------
+-> we ran different tests on endpoints on signing up and deleting the accounts.. every time we does a mail will be sent on behind
+-> we are running unnecessary test cases that racking up unnecessary emails that are never be checked
+-> so with mocking we do not send the emails. (if it is free to send emails... then there are no worries)
+
+steps:
+------
+1. create a directory "__mocks__" inside 'tests' folder (with 2 underscores on either side of mocks)
+  -> in there we can create individual modules that we are trying to mock
+
+-------------------------------------------- SKIPPED --------------------------------------------
+_____________________________________________________________________________________________________________________________________________________
+
+* Wrapping up User Tests *
+--------------------------
+
+-> send a file using superTest (send an image and get a buffer stored in database)
+-> for this we gonna set up a directory called "fixtures" >>> fixtures in tests are to set up an environment to the tests we are going to run
+-> in fixtures we put an image with that we gonna test the uploading of image to DB
+
+-> we use .attach() provided by superTest... to upload files to server
+  -> it takes two arguments of string type... form-field that we set inside the DB and path to the file
+.attach('avatar', 'image-path')
+
+code-snippet:
+-------------
+// test to upload files
+test('should upload avatar', async() => {
+  await request(app)
+  .post('/users/me/avatar')
+  .set('Authorization', `Bearer ${userOne.tokens[0].token}`)
+  .attach('avatar', 'testing/fixtures/user-avatar.jpg')
+  .expect(200)
+})
+
+-> make an assertion to check whether image uploaded or not
+-> before that we have to know that toBe is like strict equality operator and two empty objects are unequal ({} === {} -> this is false)
+-> in this case we use toEqual() >> in the place of toBe()
+ex:
+--- expect(user.avatar).toEqual(expect.any(Buffer)) >>> {expect.any() -> this is a constructor function for a type can be a String, Number, Object, Buffer etc.,}
+
+code-snippet:
+-------------
+// test to upload files
+test('should upload avatar', async() => {
+  await request(app)
+  .post('/users/me/avatar')
+  .set('Authorization', `Bearer ${userOne.tokens[0].token}`)
+  .attach('avatar', 'testing/fixtures/user-avatar.jpg')
+  .expect(200)
+
+  // check whether image uploaded or not
+  const user = await User.findById(userId)
+  expect(user.avatar).toEqual(expect.any(Buffer))
+})
+
+Challenge:
+----------
+1st test-case.
+--------------
+create "should update valid user fields"
+  - update the name of the test user
+  - check data to confirm it is changed
+
+code-snippet:
+------------
+// test user updates
+test("should test update user fields", async() => {
+  await request(app)
+  .patch('/users/me')
+  .set('Authorization', `Bearer ${userOne.tokens[0].token}`)
+  .send(
+    {
+      name: "dummy-user",
+    }
+  )
+  .expect(200)
+  // confirm that user-field has changed or not
+  const user = await User.findById(userId)
+  expect(user.name).toEqual("dummy-user")
+})
+
+2nd test-case.
+--------------
+Create "should not update invalid user fields"
+  - update a "location" field (location was not set on user-DB) and expect error status code
+
+code-snippet:
+------------
+// should not pass the test for user invalid fields
+test("should not update user fields", async() => {
+  await request(app)
+  .patch('/users/me')
+  .set('Authorization', `Bearer ${userOne.tokens[0].token}`)
+  .send(
+    {
+      location: "India",
+    }
+  )
+  .expect(400)
+})
+_____________________________________________________________________________________________________________________________________________________
+Note:
+-----
+1. we have set up necessary tests on to user model and we need to set tests on tasks as well
+_____________________________________________________________________________________________________________________________________________________
+
+* Setup Task Test Suite *
+-------------------------
+1. to fire the task-tests we do not have access to test user that is created and manipulated inside user.test.js
+2. so we have to make access to that test data for both the user.test.js and task.test.js
+3. to test other task endpoints we have to create dummy tasks in a DB as like we have created dummy user inside user.test.js
+
+-> so in order to do this... we have to create a "db.js" file inside "testing/fixtures"
+-> in db.js...
+  -> copy the below code from user test suite and paste inside db.js
+
+const jwt = require('jsonwebtoken')
+const mongoose = require('mongoose')
+
+// create an Id for user
+const userId = new mongoose.Types.ObjectId()
+// create a dummy-user
+const userOne = {
+  _id: userId,
+  name: "dummy",
+  email: "dummy@fake.com",
+  password: "DB.dummy@111",
+  tokens: [{
+    token: jwt.sign( {_id: userId}, process.env.JWT_SECRET_STR )
+  }]
+}
+_____________________________________________________________________________________________________________________________________________________
+
+* Setup Task Test Suite *
+-------------------------
+intro:
+------
+-> we have created a separate file called "db.js" which holds the database-setup...
+  - which holds the functionality to clear the previous users data and insert a dummy user for testing the user-endpoints
+
+code snippet:
+-------------
+const jwt = require('jsonwebtoken')
+const mongoose = require('mongoose');
+
+// imports User model
+const User = require('../../src/models/user')
+
+// create an Id for user
+const userId = new mongoose.Types.ObjectId()
+
+// create a dummy-user
+const userOne = {
+  _id: userId,
+  name: "dummy",
+  email: "dummy@fake.com",
+  password: "DB.dummy@111",
+  tokens: [{
+    token: jwt.sign( {_id: userId}, process.env.JWT_SECRET_STR )
+  }]
+}
+
+// cleans database and inserts a dummy user before testing
+const databaseSetup = async () => {
+  await User.deleteMany()
+  const user = new User(userOne)
+  await user.save()
+}
+
+// objects and functions are exported and imported into different test-suites
+module.exports = { userId, userOne, databaseSetup }
+
+
+user-test-suite...
+code-snippet:
+-------------------
+const request = require('supertest');
+const User = require('../src/models/user');
+
+// imported from db.js
+const { userId, userOne, databaseSetup } = require('./fixtures/db')
+
+// import app
+const app = require('../src/app')
+
+// before every test-request
+beforeEach(databaseSetup)
+
+// all user-tests starts here....
+
+
+task-test-suite...
+code-snippet:
+------------------
+const request = require('supertest');
+
+// import models- Task and User
+const Task = require('../src/models/task');
+const User = require('../src/models/user')
+
+// import database setup functionality
+const { userId, userOne, databaseSetup } = require('./fixtures/db')
+
+// import app
+const app = require('../src/app')
+
+// database setup before every test-request
+beforeEach(databaseSetup)
+
+// all task-tests starts here...
+
+Note:
+-----
+1. when there are multiple tests going on and apparently they interact with the DB and there might be a chance of conflicts while running the tests
+2. as jest runs the test suites at the same time and there are different changes in the DB... so tests may fail (there is a chance that tests may interfere)
+
+-> so we modify the test-script inside "package.json"
+  - "test": "env-cmd -f ./config/test.env jest --watch --runInBand"
+-> this helps in running the tests in series
+
+task-test 1:
+------------
+-> this checks that endpoint creates tasks for users or not
+
+// test to create tasks for users
+test("Should create task for user", async() => {
+  const response = await request(app)
+  .post('/tasks')
+  .set('Authorization', `Bearer ${userOne.tokens[0].token}`)
+  .send({
+    description: 'Testing Tasks'
+  })
+  .expect(201)
+
+  // check tasks was created or not
+  const task = await Task.findById(response.body._id)
+  expect(task).not.toBeNull()
+
+  // check task field "completed" is assigned to "false" by default or not
+  expect(task.completed).toEqual(false)
+})
+
+_____________________________________________________________________________________________________________________________________________________
+
+* Testing with Task Data *
+--------------------------
+Note:
+-----
+1. like how we created a dummy-user and set that in the DB like... similarly we have to create a dummy-task data inside DB
+  - this helps us to test other task-endpoints
+  - create dummy-tasks
+
+other task-tests
+----------------
+
+code-snippet:
+-------------
+// create a dummy-task
+const taskOne = {
+  _id: new mongoose.Types.ObjectId(),
+  description: 'Dummy Task One',
+  completed: false,
+  createdBy: userOneId
+}
+
+Challenge-1:
+------------
+Goal: Test GET /tasks
+//
+1. request all tasks for user-one
+2. assert correct status code
+3. check length of response array (has to be 2) >>> cause we had created two tasks upon userOne
+4. test!
+
+code-snippet:
+-------------
+// test to get all tasks created by userOne
+//
+test("Should get all tasks with userOne", async() => {
+  const response = await request(app)
+  .get('/tasks')
+  .set('Authorization', `Bearer ${userOne.tokens[0].token}`)
+  .send()
+  .expect(200)
+
+  // check the length of the array --- the result of getting tasks
+  expect(response.body.length).toEqual(2)
+})
+
+Challenge-2:
+------------
+Goal: Test delete task - security
+//
+1. attempt to have 2nd user delete the 1st task (should fail)
+  - setup necessary exports from db.js
+2. assert failed exports from db.js
+3. assert the task is still in the db
+4. test
+
+code-snippet:
+-------------
+// test that other users should not delete a user tasks
+//
+test('should not delete other user tasks', async() => {
+  const response = await request(app)
+  .delete(`/task/${taskOne._id}`)
+  .set('Authorization', `Bearer ${userTwo.tokens[0].token}`)
+  .send()
+  .expect(404)
+
+  // make sure that task is not deleted by user-two
+  const task = Task.findById(taskOne._id)
+  expect(task).not.toBeNull()
+})
+_____________________________________________________________________________________________________________________________________________________
+
+* Bonus Extra Test Ideas *
+--------------------------
+//
+// User Test Ideas
+//
+// Should not signup user with invalid name/email/password
+// Should not update user if unauthenticated
+// Should not update user with invalid name/email/password
+// Should not delete user if unauthenticated
+
+//
+// Task Test Ideas
+//
+// Should not create task with invalid description/completed
+// Should not update task with invalid description/completed
+// Should delete user task
+// Should not delete task if unauthenticated
+// Should not update other users task
+// Should fetch user task by id
+// Should not fetch user task by id if unauthenticated
+// Should not fetch other users task by id
+// Should fetch only completed tasks
+// Should fetch only incomplete tasks
+// Should sort tasks by description/completed/createdAt/updatedAt
+// Should fetch page of tasks

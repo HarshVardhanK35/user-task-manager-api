@@ -1,0 +1,556 @@
+//Rest APIs and Mongoose//
+Intro...
+1. Here we can create our express-based REST API.
+2. we are going to explore Mongoose when working with Node and MongoDB.
+3. Mongoose which is easy for modeling data
+4. we are going to set various data fields and data types for data validation.
+
+(visit "mongoosejs.com" for more details...)
+
+
+* setting up Mongoose...
+Intro...
+-> for docs which fields are required and which are optional and what types of data that I expect.
+("task-completion" field need to be boolean not to be a string) --- this is "validation"
+-> with mongoose we can add "authentication" to an app.
+-> with mongoose we can create "model"
+-> mongoose uses the mongodb behind the scenes.
+
+Model.
+1. this allows us to model something in the real world so that we can store in the database.
+(if we are creating an "IKEA" website we have to  model various furniture with their names, price, dimensions)
+2. we use these models to describe the data inside DB.
+
+Mongoose
+1. this provides straight, schema-based solution to model app data
+2. includes built-in type-casting, Query-building, business logic hooks and more
+
+-> Mongoose falls under broader category of tools known as ODMs (ODM - Object Document Mapper)
+(that is with mongoose... objects in NodeJS app over to docs inside mongodb database)
+
+1. Install... "npm i mongoose".
+2. directory tree... task-manager(D) -> src(D) -> db(D) -> mongoose.js(F).
+3. For more details about the code follow the above folder structure to review the code.
+
+// to connect to the DB
+......................... mongoose.connect()
+-> takes in connectionURL and options object {useNewUrlParser: true, useCreateIndex: true}
+-> with options setting to true... when mongoose works with mongodb indexes are created allows us to access data we need to access
+-> to create a model we use mongoose.model()
+
+ex:
+// connect to the database --- takes connection URL, options
+mongoose.connect("connectionURL")
+  .then(() => {console.log("connected to database")})
+  .catch((err) => {console.log(err)});
+
+// create a model using mongoose.model() which takes 2 args... string-name for model and schema definition for all of the fields
+const User = mongoose.model('User', {
+  name: { type: String },
+  age: { type: Number }
+})
+
+// create instances to add documents to DB
+const user1 = new User({
+  name: "user-1",
+  age: 23
+})
+
+// save to the DB use methods on the instance that we have created
+user1.save()
+.then(() => { console.log(user1) })
+.catch((err) => { console.log(err) })
+
+
+* Data visualization and sanitization: P-1 & 2
+
+Validation:
+-> rules for data.
+-> validating a document by setting --- required: true (for not an optional field)
+
+Sanitization:
+-> altering the data before saving it.
+-> sanitizing a field value by removing extra spaces around
+
+1. when a required field is not provided we get an error and parsing that will help user to know where the error actually happened
+2. if that field is not set to required then it is an optional
+
+-> so to validate other fields like (age, phone number and others) we can use our own validate() function
+-> to validate age...
+  validate(value){
+    if (value < 0) {
+      throw new Error("Age must be a positive number!")
+    }
+  }
+-> to validate other fields like (numbers, social security number etc) we have an NPM library  "validator"
+-> to install: "npm i validator"
+-> and import into application using "require()" function
+
+Sanitization:
+
+1. trim, lowercase, uppercase, match(regexp), min and max lengths.
+-> these takes the values as boolean, regexp and number etc.
+trim: true or minLength or maxLength: Number
+
+2. schema types:
+-> required, default, validate etc. as properties
+-> these takes function string boolean as values
+
+
+* Structuring a REST API
+
+-> in this we will learn how to structure HTTP endpoints for task-manager application API.
+
+Intro...
+1. REST ->(Representational State Transfer) and API ->(Application Programming Interface)
+
+API:
+-> An API is a set of rules that allows different software applications to communicate with each other.
+-> It defines methods and data formats that applications can use to request and exchange information or perform actions.
+-> set of tools that allow to build software apps.
+
+REST API:
+-> A REST API is a way for software applications to communicate with each other over the internet.
+    It follows the principles of REST, which include using standard HTTP methods like GET, POST, PUT, DELETE, etc., to perform CRUD operations on resources.
+    REST APIs typically use JSON or XML as data formats for transmitting information between the client and server.
+-> (resource: user or task) & (operations: CRUD operations on resources)
+-> simply, by using REST API... we can fetch and manipulate data
+
+1. REST API --- a server that is stateless.
+2. state been transferred from server to client.
+3. requests are being made by HTTP requests.
+
+GET request:
+        Need to show data           GET(req)/ tasks/ _id:a7ea              found data in database
+                    \           -------------------------------->               /
+                    client                                                  server
+                                <--------------------------------
+                                       200- JSON res
+
+POST request:
+          I am Jade and
+          I need to create a todo      POST(req)/ tasks/ JSON req         Identity confirmed and Todo created
+                    \               -------------------------------->       /
+                    client                                                server
+                                    <--------------------------------
+                                              201- JSON res
+--- GET
+1. client makes an HTTP req to a specific URL to the server here above we are using GET- HTTP method to make req to id: a7ea
+2. server finds data in DB and sends the HTTP response with 200 as status code -> (GREEN) in JSON format.
+3. so client renders the data.
+--- POST
+1. we see a 201_Status_Code... which says that a resource was created.
+
+REST API structure - Predefined operations:
+--------------------------------------------- resource --- METHODS /url-endpoints
+1. CREATE --- [POST /tasks]
+          multiple resources --- [GET /tasks]
+        /
+2. READ
+        \ single / individual resource --- [GET /tasks /:id] (":id" a placeholder replaced with some value)
+3. UPDATE --- [PATCH /tasks /:id]
+4. DELETE --- [DELETE /tasks /:id]
+
+WHAT?
+what exactly is sent between client and server when we make request?
+-> it is text.
+
+STRUCTURE OF AN HTTP REQ:
+
+          POST /tasks HTTP/1.1
+          Accept: application/json
+          Connection: Keep-Alive
+          Authorization: "something"
+
+        {"description": "water plants"}
+      /                            \
+client                              server
+      \                            /
+          HTTP/1.1 201 created
+          Date: date and time when it is created
+          Server: Express
+          Content-Type: application/json
+
+  {"_id": shgjkswhgjhdgjkh, "description": "water plants", "completed": false}
+
+REQ -> Client to Server:
+1. req-line: consists HTTP method used, path and HTTP protocol.
+2. req-headers: these are key-value pairs which attaches meta info to the request.
+  2.1 Accept: we are expecting JSON data.
+  2.2 Connection: we make other connections shortly so keep this connection open.
+  2.3 Authorization: to set up authentication.
+
+RES -> Server to Client:
+1. status line: HTTP protocol and 201 status code -> that means created
+2. response headers:
+  2.1 Date: time and date when a data created.
+  2.2 Server would be Express.
+  2.3 Content-Type: meta-data about which type of data has been created.
+  2.4 {data}: response body... with id attached to the data data that has been created.
+
+
+* Installing Postman
+
+POSTMAN:
+-> platform for API development that simplifies the process of designing, testing, and documenting APIs.
+-> an interface for sending HTTP requests to APIs
+-> Postman supports various request types (GET, POST, PUT, DELETE, etc.), authentication methods
+          and response validations, making it a valuable tool for developers working with APIs.
+
+Intro:
+-> we have made HTTP requests using browser
+-> now we have a tool to fire all HTTP requests and allows us to test and verify REST API
+
+--- The tool is "POSTMAN" ---
+-> visit "getpostman.com" to install this tool.
+
+-> when we use this tool --- we can test the endpoints without creating a client.
+
+
+* Resource creation- Endpoints: Part-1
+
+-> install nodemon as dev dependency and express as main dependency.
+-> create index.js in src directory which will be the starting point of application.
+-> for more details check out the code inside index.js
+
+-> on postman, if we want to create user we make a post request
+--- app.post('path of URL', cb-fun() => {})
+-> so to create user we use postman by setting the raw data on body tab with JSON format
+-> JSON data that we POST will be
+    {
+      "name": "john",
+      "email": "john123@email.com",
+      "password": "JoHn124@"
+    }
+
+-> to access this in our application we have to use 2-step process:
+  1. configure Express --- to automatically parse the incoming JSON for us.
+  2. so set up a call to app.use() function.
+-> use: "app.use(express.json())"
+  -> this above line parses incoming JSON to an object.
+  -> so to access that object in request handlers... we use "req.body" log this to console and send POST-request from postman.
+
+-> so to create an user using this object within the main index.js file we have to
+  1. create "models" directory inside "src" and create "user.js" file.
+  2. cut, copy and paste the User model code from mongoose.js to user.js file.
+  3. so now we can import and export the code from it.
+
+-> so import mongoose connection from db/mongoose.js into index.js and User model from model/user.js into index.js
+-> do not forget to include a middleware that automatically parses JSON.
+  -> app.use(express.json())
+  -> now, we can create a new instance using "new" keyword... after importing user model
+      const user = new User()
+  -> User() this takes an object with name, email and password as properties... as we can access it using req.body we can pass them.
+  -> after creating User user save() to save the user to database and this returns a promise so use .then() and .catch() to consume that promise.
+
+-> if something goes wrong while creating an user we get an error and to handle this we use .catch((e)=>{res.send(e)})
+  -> we send back the same error as a response
+-> while sending back the error... change the status code (we get 200 OK either we get an error or not)
+-> when user enters invalid data then we get 200 OK but we have to get 400 series.
+
+Status Codes:
+(visit "httpstatuses.com")
+
+100 series-> informational
+200 series-> success
+300 series-> re-directional
+400 series-> client error
+500 series-> server error
+
+-> to set the status code we have status method on response object.
+  -> res.status()
+-> it takes an argument that is the status code and that will be set before sending the error as response.
+
+
+* Resource creation- Endpoints: Part-2
+
+-> resource created are... tasks with an endpoint {localhost:3000/tasks}
+-> code used for creation of users is the same code used here for task creation also.
+
+conclusion:
+-> related to status codes
+-> when we send data to create user or task and everything went well... express assumes it to be 200 OK.
+-> express sets it to 200 for successful operation
+-> but on httpstatuses we have more than one way to say that things went well.
+-> so... 201 must be an appropriate status code for resource creation.
+
+Note:
+-> at last, we have the REST API endpoints for resource creation (for "C" in CRUD).
+
+
+* Resource READing Endpoints: part-1
+
+-> there are 2 types of endpoints: one to get multiple resources and another to target a specific item by its unique Id.
+-> there will be two endpoints for each users and tasks collection.
+
+Mongoose methods to fetch all users and a user with user-Id...
+-> visit mongoose for these methods and we can find it on queries guides.
+-> this contains a list of methods directly on Model (that is User and Task)
+
+methods for CRUD operations from mongoose are:
+---
+1. DELETE operation:
+Model.deleteMany()
+Model.deleteOne()
+---
+2. FETCHING operation:
+Model.find()
+Model.findOne()
+---
+Model.findById()
+Model.findByIdAndDelete()
+Model.findByIdAndRemove()
+Model.findOneAndDelete()
+---
+3. replace operation:
+Model.replaceOne()
+Model.findOneAndReplace()
+---
+4. UPDATE operation:
+Model.updateOne()
+Model.updateMany()
+Model.findByIdAndUpdate()
+Model.findOneAndUpdate()
+
+Multiple users
+-> to fetch all users we use "find()" with an arg which is an empty object on User model
+  -> User.find({}) --- this returns a promise and which needs to be consumed with .then() and .catch()
+
+-> Passing an empty object {} as an argument to User.find({}) means you're specifying an empty filter criteria.
+-> In MongoDB, when you pass an empty object as a filter, it will return all documents from the collection.
+
+ex:
+// fetching multiple users --- use find method...
+app.get('/users', (req, res) => {
+  User.find({})
+  .then((users) => {
+    res.send(users) // array of users
+  })
+  .catch((err) => {
+    res.status(500).send(err)
+  })
+})
+
+Single user
+-> to fetch single user with unique Id
+    -> app.get('/users/:id') --- /users/:id where ":id" is dynamic which is the id of the user when we fetch
+    -> :id changes when requests are being made --- capture the value that changes every time.
+    -> to get access in the route handler so that we can fetch the user correctly.
+
+  -> to this express gives us route parameters so in callback function (req, res) req- request gives us access to params object
+    -> "req.params" gives us all route parameters
+ex:
+// fetching single user --- using unique Id
+app.get('/users/:id', (req, res) => {
+  const _id = req.params.id;
+  User.findById(_id)
+  .then((user) => {
+    res.send(user)
+  })
+  .catch((err) => {
+    res.status(500).send(err)
+  })
+})
+
+
+* Advance Concepts
+
+* Promise Chaining
+------------------------------------------------------
+-> till now we did single asynchronous operation.
+-> but what if we want to do multiple asynchronous operations.
+
+code snippet:
+require('../src/db/mongoose');
+const Task = require('../src/models/task');
+
+Task.findByIdAndDelete('663dca463325276681873294')
+.then((res) => {
+  console.log(res)
+  return Task.countDocuments({ completed: false })
+})
+.then((res) => {
+  console.log(res)
+})
+.catch((err) => {
+  console.log(err)
+})
+
+conclusion:
+-> to know more on this visit "playground/ 7-promises.js" and "task-manager/ promise-chaining"
+-> lastly, if we get a deprecation warning set "useFindAndModify" property to "false" in options of mongoose.connect(url, options)
+-> because mongoose uses mongodb native driver behind the scenes (we see this only when we use olden version of mongoose)
+
+-> it will look like this...
+  mongoose.connect(connectionURL, {
+    useNewUrlParser: true,
+    useCreateIndex: true,
+    useFindAndModify: false
+  })
+
+
+* Async/Await
+
+-> set of tools which helps to work with asynchronous promise- based code easily.
+-> these helps to manager the code when we work with a lot of asynchronous operations.
+-> this plays a major role in task-manager app especially with route handler part.
+
+1. theoretical explanation: created a file inside normal playground directory in root folder.
+-> async-await: this allows us to create an async function, in that we can use the await feature.
+-> for more details follow up the code inside (main-folder/ playground/ 8-async-await.js)
+-> to change a function as asynchronous function simply use "async" keyword before the function declaration
+  -> const function = async() => {}
+-> inside the function we can use "await" feature.
+
+ex:
+const add1 = (a, b) => {
+  return new Promise(( res, rej ) => {
+    setTimeout(() => {
+      if(a < 0 || b < 0) {
+        return rej( "Numbers must be positive" )
+      }
+      res(a + b)
+    }, 2000)
+  })
+}
+const addResult1 = async() => {
+  const sum = await add1(1, -2);
+  const sum1 = await add1(sum, 3);
+  return sum1
+}
+addResult1()
+.then((res) => { console.log(res) })
+.catch((err) => { console.log(err) })
+
+-> with code in above example we have error in the 1st line --- const sum = await add1(1, -2) --- as we have to pass only positive numbers we passed a negative number
+-> we know that an error may get so we have to handle the error using "try-catch" block
+
+---------------- Try-Catch block:
+try{
+  const sum = await add1(1, -2);
+}
+catch(err){
+  clg(err)
+}
+
+explanation:
+-> try{ "const sum = await add1(1, -2)" } ... or if it returns error catch the error using "catch(err){}"
+
+important:
+-> async functions return promise as a result and that promise is fulfilled with a value.
+
+2. practical (real-world) explanation: created a file in play-ground directory inside task-manager app directory.
+-> visit (main-route/ task-manager/ playground/ promise-chaining and promise-chaining-1) files.
+-> now the code inside these files are real-world examples so we have to change using async-await.
+
+
+* resource updating endpoints... part-1
+
+>>> main method
+-> we use app.patch() to update an existing resource.
+-> takes two arguments
+  1. path --- gets individual user by it's Id.
+  2. async function(req, res)
+
+>>> method used here...
+-> the mongoose function we use is: Model.findByIdAndUpdate()
+-> this takes three arguments
+  1st... id = req.params.id
+  2nd... data we want to update
+    ---> it must not be the static data object with fields... { 'name': 'Jake' }
+    ---> must provide the dynamic data... { req.body } -> data will be sent through HTTP request -> that is the data from the body tab inside postman.
+  3rd... options: { new: true, runValidators: true }
+    ---> new: true... we will get the latest data after updating.
+    ---> runValidators: true ... validates the data we sent
+-> handles the error using if block and if there is no user send a 404 response
+-> and handle the error using catch block if an error (validation error / server err) has occurred.
+
+>>> if user wants to update a property that does not exist then mongoose is ignoring that but it is an error and need to handle it!
+1. const reqBodyUpdates = Object.keys(req.body)... this converts the properties of ab object and turns it into array of keys as strings
+2. "every" is a method that we used here which checks on each key and returns true... if there is a single false every returns a false as a return value
+ex:
+app.patch('/users/:id', async(req, res) => {
+  const reqBodyUpdates = Object.keys(req.body);
+  const updatesAllowed = ['name', 'email', 'password', 'age'];
+  const isValidOperation = reqBodyUpdates.every((reqBodyUpdate) => {
+    return updatesAllowed.includes(reqBodyUpdate)
+  })
+  if(!isValidOperation) {
+    res.status(400).send({ error: "Invalid updates!" })
+  }
+  const _id = req.params.id
+  try{
+    const user = await User.findByIdAndUpdate(_id, req.body, { new: true, runValidators: true })
+     if(!user){
+      res.status(404).send()
+    }
+    res.send(user)
+  }
+  catch(err){
+    res.status(400).send(e)
+  }
+})
+
+
+* resource updating endpoints... part-2
+
+-> app.patch('/tasks/:id', async(req, res) => {
+  const reqBodyUpdates = Object.keys(req.body);
+  const updatesAllowed = ['description', 'completed'];
+  const isValidOperation = reqBodyUpdates.every((reqBodyUpdate) => {
+    return updatesAllowed.includes(reqBodyUpdate)
+  })
+  if(!isValidOperation) {
+    res.status(400).send({ error: "Invalid updates!" })
+  }
+  const _id = req.params.id
+  try{
+    const task = await Task.findByIdAndUpdate(_id, req.body, { new: true, runValidators: true })
+     if(!task){
+      res.status(404).send()
+    }
+    res.send(task)
+  }
+  catch(err){
+    res.status(400).send(e)
+  }
+})
+
+
+* resource delete endpoints
+
+// task deletion: delete a task with Id
+app.delete('/users/:id', async(req, res) => {
+  const _id = req.params.id
+    try{
+      const user = await User.findByIdAndDelete(_id)
+
+      if(!user){
+        res.status(404).send("User not found!")
+      }
+      res.send(user)
+    }
+    catch(err){
+      res.status(500).send(err)
+    }
+})
+
+
+* Separate the route files
+
+Intro:
+-> we made the main index file complex with all routes included in it.
+-> so we separate the rotes for users into a new file same for task routes too.
+
+steps:
+>>> include a line in index.js that is: const router = new express.Router()
+  -> class that provides a way to create modular, mountable route handlers
+  -> It allows you to define routes and middleware separately and then combine them into a single router
+>>> we can access CRUD methods on the object we have created that is "router"
+  -> router.get(); router.delete(); etc.
+>>> but these methods can not work it needs a middleware that is: app.use(router)
+>>> inside "src" directory create a folder "routers" and in that create a "user.js" to inject all the routes that were created inside "index.js"
+>>> include the code inside user.js and export it from there and import it inside main file(index) "const userRouter" = require('./routes/user')
+  -> to use the "userRouter" we must use a middleware "app.use(userRouter)"
+>>> and replace all app.get()... app.post() etc. with "router" because the "app" is no longer exists inside the user.js routes
+>>> 

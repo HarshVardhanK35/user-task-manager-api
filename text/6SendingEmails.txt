@@ -1,0 +1,211 @@
+* Sending Emails *
+------------------
+
+> Exploring SendGrid:
+-----------------------
+intro:
+-------
+1. sending emails from node.js in this section we will be using sendGrids { visit: sendgrid.com }
+-> (but there is an error occurred while registering to this website)
+2. so we are using 'nodemailer' to send emails using nodejs
+
+snippet:
+--------
+const nodemailer = require('nodemailer');
+
+// dotenv configuration
+require('dotenv').config()
+
+// Create a transporter using your Gmail account
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.USER_EMAIL,
+    pass: process.env.GMAIL_APP_PASS,                                           // You might need to generate an app password
+  },
+});
+
+const mailOptions = {
+  from: {
+    name: 'Testing-App',
+    address: process.env.USER_EMAIL
+  },
+  to: "kasavardhan2001@gmail.com",                                              // use array of emails if there are more than one email to send
+  subject: "Testing Application by Sending Emails using Nodemailer and Gmail",
+  text: "Hello World!",
+  // attachments: [
+  //   {
+  //     filename: 'test.pdf',
+  //     path: path.join(__dirname, 'test.pdf'),
+  //     contentType: 'application/pdf'
+  //   },
+  //   {
+  //     filename: 'image.png',
+  //     path: path.join(__dirname, 'image.png'),
+  //     contentType: 'image/png'
+  //   }
+  // ]
+}
+
+const sendMail = async(transporter, mailOptions) => {
+  try{
+    await transporter.sendMail(mailOptions);
+    console.log('email has been sent successfully!')
+  }
+  catch(err){
+    console.log(err)
+  }
+}
+
+// Immediately Invoked Function Expression (IIFE) to send the email
+(async() => {
+  await sendMail(transporter, mailOptions)
+})();
+
+explanation:
+------------
+// Create a transporter using your Gmail account
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.USER_EMAIL,
+    pass: process.env.GMAIL_APP_PASS,                                           // You might need to generate an app password
+  },
+});
+-------------------------------------
+-> service >>> 'gmail'-> This specifies that we are using Gmail as the email service provider.
+-> host >>> "smtp.gmail.com" -> This is the hostname for Gmail's SMTP server.
+-> port >>> 587 -> This is the port for the SMTP server. Port 587 is commonly used for TLS (Transport Layer Security).
+-> secure >>> false -> This indicates that we are not using SSL (Secure Sockets Layer) directly.
+                    -> If you set this to true, you would typically use port 465.
+-> auth >>> { user, pass } -> This object contains the authentication details for the email account.
+                            -> The user is the email address, and the pass is the password. These are retrieved from environment variables (process.env.USER_EMAIL and process.env.GMAIL_APP_PASS) for security reasons
+
+// Immediately Invoked Function Expression (IIFE) to send the email
+(async() => {
+  await sendMail(transporter, mailOptions)
+})();
+------------------------------------
+>>> (async () => { ... })() -> Defines and immediately invokes an asynchronous function.
+>>> await sendMail(transporter, mailOptions) -> Calls the sendMail function with the transporter and mail options as arguments and waits for it to complete.
+>>> By using an IIFE, the email is sent as soon as the script is run, without needing to call the sendMail function explicitly elsewhere in the code.
+
+Important points:
+-----------------
+1. generate and use recipient's gmail address to generate app_password
+
+Summary:
+--------
+-> Transporter: Configures the email sending service using Gmail.
+-> sendMail function: Sends the email using the configured transporter.
+-> IIFE: Immediately invokes the sendMail function to send the email when the script runs
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+> Sending Welcome and Cancellation Emails
+-----------------------------------------
+intro:
+------
+1. the code that generates an email need to be integrated into task-app
+2. when user creates an account... user gets a welcome email
+
+Note:
+-----
+-> we can also insert HTML
+
+const sendWelcomeMail = async(transporter, email, name) => {
+  try{
+    await transporter.sendMail({
+      from: {
+        name: 'Task Management Application',
+        address: process.env.USER_EMAIL
+      },
+      to: email,                                              // use array of emails if there are more than one email to send
+      subject: "Thanks for signing in Task-Management Application",
+      text: `Welcome to the application, ${name}. Let me know how you get along with the application.`,
+      html: `<p>Welcome to the application, <strong>${name}</strong>. Let me know how you get along with the application.</p>`,
+    });
+    console.log('Welcome email has been sent successfully!')
+  }
+  catch(err){
+    console.log(err)
+  }
+}
+
+-> uses same "transporter" which is constant
+
+// Create a transporter using your Gmail account
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.USER_EMAIL,
+    pass: process.env.GMAIL_APP_PASS,                                           // You might need to generate an app password
+  },
+});
+
+explanation:
+------------
+-> we sent the Welcome-emails and Cancellation-emails to users when they creates account and when they deletes their account respectively
+
+-> inserted WelcomeEmail inside POST- "/users" route after saving the user to DB
+-> inserted CancellationEmail inside DELETE- "/users/me" route after deleting was successful
+
+Note:
+------
+-> same format for both CancellationEmail and WelcomeEmail
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+> Environment Variables:
+------------------------
+intro:
+-------
+-> using environment variables are necessary for security and customizability.
+-> whole lot of API keys and connection URLs must not be hardcoded they have to be inside .env files
+
+using env:
+----------
+-> create "config" folder in task-manager application and the files inside it has to be ignored by setting up the ".gitignore" file
+-> create a new file "dev.env" for development inside "config" to store all the environment variables used for development
+-> this file consists of key=value pairs
+
+-> to use these variables into our code we have to install "env-cmd" with which we can use env variables across different platforms
+  -> install it as dev-dependency "npm i env-cmd --save-dev" so we can use these on "windows / linux / mac"
+  -> "npm i env-cmd --save-dev" we have to use locally but not on heroku
+
+-> with this package we have to change the script inside package.json
+  -> before "dev": "nodemon src/index.js" >>> after modification... "dev": "env-cmd -f ./config/dev.env nodemon src/index.js"
+
+Note:
+------
+1. now "env-cmd" is not working with my project so i am going with "dot-env"
+2. we provide two types of variables one of it runs locally and another runs after deployed to heroku
+3. 
+
+security and customizability issues:
+------------------------------------
+
+1. PORT:
+--------
+-> we use PORT=3000 as the port for our application inserted inside env file
+
+
+2. Database- connection:
+-------------------------
+-> the hardcoded database URL or the connection string from the mongodb-atlas
+  -> need to be set into an environment variable
+-> so when we provide DB URL then the app connects to the local database
+Note:
+------
+-> when we deploy to heroku and we have local database- URL in the app... so heroku connects to local database that is not going to exist
+-> so we can use two values...
+  -> when we run locally we use local DB-URL
+  -> when we deploy to heroku we use mongodb connection string
+->

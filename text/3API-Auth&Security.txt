@@ -1,0 +1,1288 @@
+* Section Intro  *
+-----------------
+1. focus on locking all the data.
+2. all API endpoints are accessible to public, anyone access the data. so any user have to sign-up and login to view / change the data.
+3. so in this section a user cannot modify another user's data in the database.
+
+-> so in this section... we focus on authentication, password security, database and data relationships etc.
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+* securely storing passwords in database: part-1 *
+--------------------------------------------------
+Note:
+-----
+-> as there are two ways to hash the password (encrypt and bcrypt)
+-> it is recommended to use bcrypt because by using encrypt we get the same password back if we hack the password.
+-> encrypt are reversible and bcrypt algorithms are irreversible.
+
+1. till now we have been storing passwords as plain text inside database (that is not a right practice).
+
+2. we have to hash the password... the algorithm that we will be using is "bcrypt" which is not reversible.
+  -> we can do this by using "bcrypt.js" from npm modules install the module to hash the password.
+  -> to install bcrypt as a dependency... use: "npm i bcryptjs"
+
+3. we have to use async-await functionality... as we are working with promises from bcryptjs.
+
+4. bcrypt provides a method that is "hash"
+
+bcrypt - methods
+-----------------
+1. this takes the password we entered as a 1st arg.
+
+2. number as no. of rounds we want to perform on that plain text password.
+  -> the no. of rounds tells how many times the hashing algorithm has to be executed.
+  -> as bcrypt's creator suggested that "8" as a good number for hashing.
+    -> it is not safe if the number is less than 8 and processing runs slower if it exceeds.
+
+3. while logging, to check the entered password is same as that we entered while registering... we have a method called "compare"
+  -> this gives us a promise
+  -> takes 2 arg... (1. plain text password --- 2. hashed password)
+  -> returns a boolean as a result after consuming the promise.
+
+ex:
+const bcrypt = require('bcryptjs')
+const myFunction = async() => {
+  const password = "Har123@Wip"                                       // for hashing the password
+  const hashedPassword = async bcrypt.hash(password, 8)
+  // clg(hashedPassword);
+
+  const isMatched = await bcrypt.compare(password, hashedPassword)    // for comparing the password
+  // clg(isMatched)                                                   // returns a boolean
+}
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+* securely storing passwords in database: part-2 *
+--------------------------------------------------
+Intro :
+-----
+1. in this we are going to integrate bcrypt to hash the passwords inside the Task Manager API.
+
+2. we have to hash the password at creating the user and updating the user
+
+-> in order to add a functionality there is no need to change the existing code.
+-> we customize the user model... mongoose supports middleware.
+
+middleware:
+-> with this we can register some functions to run before or after given events occur
+-> there are: (validate, save, remove, init)
+-> save: we can run a piece of code before or after a user is saved (in our case we have to run the code before the user is saved)
+
+steps:
+
+1. in the code for user model we created the allowed properties and passed directly as the 2nd arg inside mongoose.model('User', {schema goes here})
+  -> so here we create the "userSchema" separately and pass the model into it (for more details check the code)
+
+ex:
+const userSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, trim: true, },
+    email: { type: String, required: true, lowercase: true, trim: true,
+      validate(value) {
+        if(!validator.isEmail(value)){
+          throw new Error("Email is invalid!")
+        }
+      }
+    },
+    password: { type: String, required: true, trim: true, minlength: 7,
+      validate(value) {
+        if(value.toLowerCase().includes("password")){
+          throw new Error("Invalid password!")
+        }
+      }
+    },
+    age: { type: Number, default: 0,
+      validate(value) {
+        if(value < 0) {
+          throw new Error('Age must be a positive number!')
+        }
+      }
+    }
+  }
+)
+const User = mongoose.model('User', userSchema);
+
+2. so we can access the schema.. on schema we have 2 methods (pre and post) "pre" --- before an event and "post" --- for after an event
+  -> so we run before an event so it is "pre"
+  -> this takes two arg (name of the function, function to run)
+
+3. the function passed uses binding so we have to use normal async function
+  -> const user = this... Here, this refers to the document being saved (user document that has been created).
+  -> In Mongoose middleware functions, this represents the document itself.
+
+4. when we update the "user" using this middleware then "findByIdAndUpdate" bypasses the middleware functions defined inside mongoose schema
+  -> it performs a direct update operation on the database without going through the Mongoose middleware hooks such as pre and post hooks.
+  -> so we have to use traditional way to update a user
+  -> so we update the document using "findById" followed by modifying its properties and then calling "save()".
+
+ex:
+  const user = await User.findById(_id)
+    reqBodyUpdates.forEach((update) => {
+      user[update] = req.body[update]
+  })
+  await user.save()
+-> this is the small modification in user routes inside update route that needed to run the middleware.
+
+5. check if the password is actually hashed before so we do not hash it again.
+  -> user has a method... isModified('password') checks
+  -> this condition checks if the password field of the user document has been modified.
+  -> if it has, it means that the password is being updated or created for the first time.
+
+6. we pass "next" to the function... what is next? and how does js knows that we are done with running of the code?
+  -> "next" takes care of it... it say that function is finished...
+  -> so we simply call next after we are done running our code
+ex:
+userSchema.pre('save', async function(next) {
+  const user = this  // accessing the model using "this"
+  if(user.isModified('password')){
+    user.password = await bcrypt.hash(user.password, 8)
+  }
+  next()
+})
+
+conclusion:
+-----------
+-> without adding the password logic at multiple places so 2 routes are related to this middleware.
+
+modification inside update route of "taskRoute"
+-----------------------------------------------
+-> without using "findByIdAndUpdate" inside update route of taskRoutes...
+-> we 1st find a task by it's id and alter task properties and save the task
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+* logging in users
+------------------
+1. in this we create an endpoint that help user to log-in with their existing account
+
+2. setting up a new route in "userRoute"
+
+3. the login uses post method and path is "/users/login"
+  -> we find the user by their email and password
+  -> for this... we gonna use method that is not in-built... "findByCredentials()" which takes in email and password and it will compare it.
+
+5. the arguments will be email from body of a request and password from same.
+
+6. so if we want to use a method that we had defined inside userRoute then we have to add the below line...
+  -> userSchema.statics.findByCredentials = async (email, password) => {}
+  -> defined inside user-model and can be accessed inside userRoute
+
+7. modification inside userSchema that is email must be unique (unique: true)
+
+8. so we can understand the code right below...
+ex:
+models/user.js
+--------------
+// find a user by their email and password before login...
+serSchema.statics.findByCredentials = async (email, password) => {
+  const user = await User.findOne({ email: email })
+
+  if(!user){
+    throw new Error('Unable to login!')                                   // * IF USER WAS NOT FOUND
+  }
+
+  const isMatch = await bcrypt.compare(password, user.password)           // * IF USER WAS FOUND CHECK THE PASSWORD
+  if(!isMatch){
+    throw new Error('Unable to login!')                                   // * IF PASSWORD IS NOT A MATCH
+  }
+  return user                                                             // * IF USER WAS FOUND
+}
+
+routes/user.js
+--------------
+router.post('/users/login', async (req, res) => {
+  try {
+    const user = await User.findByCredentials(req.body.email, req.body.password)
+    res.send(user)
+  }
+  catch(err) {
+    res.status(400).send()
+  }
+})
+
+conclusion:
+-----------
+-> after all of this test the work by dropping the database and create a new one by saving the project
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+* JSON web tokens
+-----------------
+Intro :
+------
+1. every express route created will either be public or placed behind authentication (private).
+2. every route instead of (sign-up and login) need to be authenticated.
+3. if we want to delete a task we need to be authenticated... (so that we will not delete the tasks created by others)
+
+for 3rd point, what we need to do?
+----------------------------------
+1. set up the login request to send an authentication token
+
+why this section?
+-----------------
+-> in this section...
+  -> we learn how to create and mange these authentication tokens
+  -> we will be using JWT (JSON Web Tokens) for authentication
+
+
+steps to create a token:
+------------------------
+1. visit npm website -> search jsonwebtoken -> install in the root folder (npm i jsonwebtoken)
+
+2. how can we create authentication tokens and mange them:
+  -> import the library
+  -> use sign method available on JWT library
+    -> "jwt.sign()" the return value from this is new authentication token for user when he tries to login
+    -> sign() takes two arg... 1st object and 2nd is String
+      -> 1st: object takes unique value that user has with him that must be the ID that mongodb provides when a user was created
+      -> 2nd: secret string (used to sign the token in)... this takes any series of characters ex: "Iamstudyingnowisanodejscourse"
+snippet:
+--------
+const myFun = async() => {
+  const token = jwt.sign({ _id: 'abc123', "Iamstudyingnowisanodejscourse" })
+  clg(token)
+}
+
+output:
+------
+1. output will be a token with three parts separated by period
+
+2. the token consists of base-64 encoded string
+  -> "header" >>> meta info
+  -> "payload / body" >>> contains data we provided in the object
+  -> "signature" >>> to verify the token when we login
+
+
+steps to verify that token:
+---------------------------
+1. jwt.verify() >>> takes 2 arg
+  -> 1st arg: token we have created
+  -> 2nd arg: secret string that we have passed while creating the token
+
+Note:
+-----
+-> this secret code must be stored as an environment variable
+
+output:
+2. after verification we get decoded data of "payload" (payload >>> which is the second part of the encoded string)
+
+
+steps to expire a token after sometime:
+---------------------------------------
+1. while creating the token we provide a 3rd argument that will be an object type
+2. { expiresIn: '7 days' }
+  -> expiresIn takes the time period in plain english... after that certain time period the token will be expired
+
+ex:
+const jwt = require('jsonwebtoken')
+
+const myFun = async() => {
+
+  // creating JWT auth token
+  const token = jwt.sign({_id: "idOfTheUserGeneratedAfterSigningUp"}, 'thisIsForJWTAuthentication', { expiresIn: "7 days" })
+  console.log(token)
+
+  // verifying the user using JWT
+  const verifyData = jwt.verify(token, 'thisIsForJWTAuthentication')
+  console.log(verifyData)
+}
+
+output:
+-> after verification we get decoded data of "payload"
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+* Generating Authentication Tokens
+----------------------------------
+Intro :
+------
+1. the routes that are responsible for creating new user and logging in existing user send us back the JWT auth tokens
+
+2. we create a function that generate tokens that we reuse in both signing up and logging in users.
+
+in user routes - at login (routes/user)
+---------------------------------------
+router.post('/users/login', async (req, res) => {
+  try {
+    const user = await User.findByCredentials(req.body.email, req.body.password);
+    const token = await user.generateAuthToken()
+    res.send({ user, token })                                                             // we are sending back the user data and token
+  }
+  catch(err) {
+    res.status(400).send(err)
+  }
+})
+
+explanation
+------------
+1. const token = await user.generateAuthToken()
+-> why the function generateAuthToken() is on the "user" instance?
+  -> it's common to associate authentication tokens with individual users.
+  -> This is because tokens are often used to identify and authenticate specific users when they interact with the system.
+BECAUSE?
+-> Each user needs their own unique authentication token.
+
+in user model (models/user)
+---------------------------
+Note - for the below code:
+--------------------------
+-> as we are using "this" binding we have to use normal functions not arrow fns because "this" keyword does not work on arrow fns.
+1. model methods >>> User.statics:
+  -> model methods are accessible oon the models.
+  -> Static methods are called on the model itself and operate at the model level, without access to any specific instance properties.
+
+2. instance methods >>> user.methods:
+  -> Instance methods are called on individual documents (instances) and have access to instance-specific properties using this.
+  -> instance methods are accessible on instances
+
+3. user = this
+  -> "this" refers to the whole instance of the document that was created with User-Model
+
+4. const token = jwt.sign({ _id: user._id.toString() }, 'thisIsTaskMangerApplication')
+  -> as explained before "sign()" method takes unique property from user created and a secretPrivateKey (the secretPrivateKey has to be set as environment variable)
+
+snippet in user model (models/user.js)
+--------------------------------------
+userSchema.methods.generateAuthToken = async function() {
+  const user = this;
+  const token = jwt.sign({ _id: user._id.toString() }, 'thisIsTaskMangerApplication')
+  return token
+}
+
+conclusion
+----------
+1. the client can take this authentication token and can use it to make requests which need authentication
+
+
+store the tokens:
+-----------------
+1. as long as the token exists that user who holds that token is stayed logged in
+
+2. we have to store all the tokens we generate for a user as part of the user document
+
+modification inside user model:
+------------------------------
+1. add another field inside User model that is:
+tokens: [{
+  token: {
+    type: String,
+    required: true
+    }
+}]
+
+2. so the generated token has to be concatenated to this array of tokens objects instead of returning
+
+updated code will be
+--------------------
+userSchema.methods.generateAuthToken = async function() {
+  const user = this;
+  const token = jwt.sign({ _id: user._id.toString() }, 'thisIsTaskMangerApplication')
+  user.tokens = user.tokens.concat({ token: token })
+  await user.save()
+}
+
+3. token was stored as a sub-doc with it's own Id that has generated while creating
+
+Note:
+-----
+1. like passwords we have to hide tokens also
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+* Express Middleware functions
+------------------------------
+1. every request to the API need to be authenticated so client need to send that token... so the server can validate it.
+
+2. use "express middleware" to get all this done.
+
+Intro :
+------
+What is middleware --- CHATGPT?
+-------------------
+1. without middleware --- new req -> run route handler
+
+2. with middleware    --- new req -> code to do something -> run route handler
+-> the code in the middle helps us to authenticate the user if the user is valid then route handler works
+
+Important Note:
+---------------
+-> we have to use middleware functions above the "app.use()" calls
+
+why to use middleware functions above the app.use() >>> CHATGPT?
+----------------------------------------------
+->
+
+How to use middleware functions?
+--------------------------------
+1. we use middleware to run a function before handling a request
+  -> but if we include middleware functions inside index.js then that will belong to all the routes of our application.
+2. based on functionality we can include middleware functions wherever we want inside routes only.
+  -> so the middleware starts before the req-res that is route - handler of a HTTP request... if we want to add middleware to a HTTP request
+3. so route handler will be called only when middleware includes next() and it calls next()
+
+router.get('/users', auth, async (req, res) => {})
+              /        |                     \
+             /         |                      \
+          path    middleware              Route handler
+
+steps:
+------
+1. we use "app.use()"
+    -> this takes in a fun which runs between new request sent and route handler execution
+    -> this fun takes three args that are (req, res, next)
+    -> "next" is specific to register on middleware calls
+
+Note:
+-> "req.method" to return http method involved
+-> "req.path" which returns path used to send request
+
+2. to execute the next middleware or function we have to call "next()" inside a middleware function.
+    -> in the following execution: "new req -> code to do something -> run route handler"
+    -> to execute route handler we have to insert or call next() inside the middleware function
+    -> if not called... the route handler never executes and shows {LOADING...}
+ex:
+----
+app.use((re, res, next) => {
+  clg(req.method, req.path)
+  next()
+})
+
+another simpler example:
+------------------------
+app.use((req, res, next) => {
+  if(req.method === "GET"){
+    res.send("GET requests are temporarily disabled")
+  }
+  else{
+    next()
+  }
+})
+
+explanation:
+------------
+-> the above code runs only for other HTTP requests except for GET request it shows message: <"GET requests are temporarily disabled">
+
+challenge:
+----------
+1. right a middleware fun to tell that website is under maintenance mode
+
+app.use((req, res, next) => {
+  res.status(503).send("site is under maintenance... check back soon!")
+})
+
+explanation:
+------------
+-> this runs for every single route handler cause we had declared inside index.js file
+-> to send a response to the client whenever the site is under maintenance
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+* Accepting Authentication Tokens
+---------------------------------
+Intro
+-----
+1. so here we gonna learn how to use middleware functions to authenticate a user using the token associated with him.
+
+2. so it is best to create a separate file to declare middleware functions (for the best practice)
+
+3. inside src directory create a middleware folder which holds separate files for each function
+    -> for example: if it is for authentication >>> auth.js file
+
+4. to export that middleware use module.exports from auth.js
+    4.1 -> to import it into other files:
+        -> as this is an authentication middleware we use this middleware inside user-route to check whether that user is valid or not
+        -> import it using require function and the return value will be stored inside "auth" variable
+            -> const auth = require('..path/ to middleware/ file')
+
+    4.2 -> to add middleware function inside a route we pass it as an argument to the HTTP method before we pass the route handler
+        -> router.get("path", "middleware function", "route handler")
+Note:
+-----
+-> route handler will be executed only if we call next() inside middleware function.
+ex:
+----
+middleware/auth.js
+--------------------
+app.use((req, res, next) => {
+  clg("auth middleware")
+  next()
+})
+
+routers/user.js
+--------------
+// import >>>
+const auth = require('middleware/auth.js');
+
+// insert middleware >>>
+router.get('/users', auth, (req, res) => {          // middleware --- "auth" used here
+  try {
+    const users =  await User.find({})
+    res.send(users)
+  }
+  catch(err) {
+    res.status(500).send(err)
+  }
+})
+
+use-case
+--------
+-> what does this auth.js do?
+-> how does authentication work?
+
+1. authentication starts from when user provides token that generates every time he/she logs in.
+  -> taking that token and providing it in the headers tab inside postman... to the request that user wants to perform
+
+2. copy the entire token and visit the request (for which we have added auth middleware to (/users)) inside postman... under it go to headers tab
+  -> so to provide this token... we set up a "request" header
+    -> go to the header tab inside postman under the request that we want to make (on that request we have added auth middleware)
+    -> set a key: value pairs to provide additional info to the server
+
+3. so the "Authorization" header is the key and the value will be the bearer-token
+  -> Authorization: Bearer <copied-token>
+  -> "capital A" in Authorization in KEY and "capital-B" in Bearer <copied token> inside VALUE
+-> this is all that client needed to provide to get authenticated
+
+4. so how can we access this token provided inside headers section of postman-request
+  -> import JSON web token library inside "auth.js- middleware file"
+    -> const jwt = require("jsonwebtoken)
+  -> load in the user-model also... to find that token in the database too... after validation of auth token
+  -> we write code to handle the token
+
+snippet:
+--------
+const jwt = require('jsonwebtoken');
+const User = require('../models/user')
+const auth = async (req, res, next) => {
+  try {
+    // Extract the token from the Authorization header and replaces the "Bearer " with nothing
+    const token = req.header('Authorization').replace('Bearer ', '');
+    // Verify the token to get the decoded payload
+    const decodedToken = jwt.verify(token, 'thisIsTaskMangerApplication');
+    // Find the user by the decoded user ID and ensure the token exists in the user's token array
+    const user = await User.findOne({ _id: decodedToken._id, 'tokens.token': token });
+    // If no user is found, throw an error to be caught by the catch block
+    if (!user) {
+      throw new Error();
+    }
+    // Attach the authenticated user to the request object
+    req.user = user;
+    // Proceed to the next middleware or route handler
+    next();
+  } catch (err) {
+    // Send an error response if authentication fails
+    res.status(401).send({ Error: "Please authenticate!" });
+  }
+}
+module.exports = auth;
+
+explained:
+----------
+1. if no token has provided we get an error... so we used try {} catch(e) {} block to handle error
+
+2. to access the token inside the header we use request.header('Authorization').replace('Bearer ', '')
+ -> it is "header" not "headers"
+ -> to verify token has provided or not we logged to the console
+ -> Authorization is the key-name we provided inside headers tab of the request
+ -> as token comes with "Bearer" we use replace function on it to replace it with nothing ('')
+
+3. usually we check the token using "jwt.verify()"
+ -> this method takes two args.... so we provide token and the secret string we provided at the time of token creation
+ -> when we logged the decodedToken to the console we get an object that contains user Id and iat (iat: time that when token has been issued)
+
+4. so if the token user provided was valid then we find the user with that token in the database
+ -> as the token is decoded we get a payload that is... { _id: '664df8c4f281758273173412', iat: 1716385988 } (iat -> timestamp that when the token was issued)
+ -> so with the Id we got we can find the user using Model.findOne() method
+  -> so findOne takes an object with two key-value pairs
+    -> {_id: decodedToken._id, 'tokens.token': token}
+      -> _id: decodedToken._id >>>
+        -> searches for user with the id
+      -> 'tokens.token': token >>>
+        -> checks for the token still exists in the token array... This is crucial for implementing features like user logout or token expiration
+
+5. if user is found...
+
+if (!user) {
+  throw new Error();
+}
+// Attach the authenticated user to the request object
+req.user = user;
+// Proceed to the next middleware or route handler
+next();
+
+why "req.user = user" was used?
+-------------------------------
+1. By attaching the user object to the request, you make it accessible to any subsequent middleware or route handler.
+  -> this avoids the need to repeat the authentication logic in every route that requires user information.
+
+
+A problem with the below route
+-------------------------------
+-> this fetches all users and their data.
+-> if a user is authenticated and access "/users" he/she gets access to all users data
+  -> change it so that he can only gets his data if he/she was authenticated.
+
+// fetching multiple users --- use find method
+router.get('/users', auth, async (req, res) => {
+  try{
+    const users = await User.find({})
+    res.send(users)
+  }
+  catch(err){
+    res.send(500).send()
+  }
+})
+
+result:
+-------
+an array of users
+
+instead use
+-----------
+router.get('/users/me', auth, async (req, res) => {
+  try{
+    const users = await User.find({})
+    res.send(users)
+  }
+  catch(err){
+    res.send(500).send()
+  }
+})
+
+result:
+--------
+-> only a user if that user authenticates with his token
+
+-> "/users/me" is the path we should have to use... to get their own profile after authenticating him
+1. Purpose: Fetch and return the authenticated user's profile.
+2. Authentication: Uses the auth middleware to ensure the request is made by an authenticated user.
+3. Response: Sends the authenticated user object that the auth middleware attached to req.user
+
+Note:
+-----
+1. change the request name inside POSTMAN: from "Read all users" to "Read Profile".
+2. change the route from "/users" to "/users/me" to get only a user after his authentication.
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+* Advanced POSTMAN
+-------------------
+Intro :
+------
+-> in this, we gonna talk about Postman environments and postman environment variables
+
+we learn:
+---------
+1. we gonna use an automatic URL not a manual URL -> by setting up an URL inside environment section postman
+2. set the token for overall API and use that for every single request using "inherit from the parent"
+
+1. Environment variables:
+-------------------------
+-> inside postman -> add new environment variable -> create "Task Manager API (dev)" and "Task Manager API (prod)"
+-> so that we can switch tabs to set specific variables to those requests
+-> inside env variable - "Task Manager API (dev)"
+  -> set "variable" to "url" and "initial value" to "localhost:3000"
+-> how to use these variables
+  -> inside a request on postman change the url from "localhost:3000/?path" to "{{url}}/?path"
+    -> to use the variable we use {{"variable-name"}}
+-> at last... change the urls for every requests
+
+
+2. Authorization > set token to all requests
+---------------------------------------------
+1st way - set the token:
+------------------------
+-> go to postman -> create a request -> click on Authorization tab -> in the dropdown... select Bearer Token and paste the token on side text box
+
+-> with this we can set token belong to send a specific request without applying same header and value for multiple requests
+
+-> drawback:
+-------------
+-> so this way of setting token... only works for specific request
+-> to apply a same token for every request follow the 2nd way of setting token in postman.
+
+
+2nd way - set the token:
+------------------------
+-> go to postman -> create a new collection -> on the side of collection... click on the three dots -> click on "edit" -> go on to the Authorization tab -> select "Bearer-token" as auth type on drop down menu -> paste the copied token in the text box
+-> to apply this token to a request... create a request -> click Authorization tab -> select the "Inherit auth from parent"
+
+-> this way of setting the token applies for every request we made on postman without manual setting
+
+Note:
+-----
+-> except for create and login users we have to remove the "inherit from parent" option
+
+
+drawback of 2nd method:
+------------------------
+-> every time a user was created... a new token will be generated for him >>> so every time we have to update the token inside the Authorization tabs on postman
+-> solution: to write 3 to 4 lines of JS code to automate this task
+
+solution:
+----------
+1. so we write the code for "create" and "login" user requests under "tests" tab
+  -> "Pre-request Script" this takes JS code that runs before request is sent off
+  -> "Tests" tab this runs the JS code after request was made
+
+2. JS code is to extract token property from the body and sets that token to an environment variable.
+
+3. so we use this environment variable inside the Authorization tab of total collection
+  -> that means we replace the direct token we inserted before with this environment variable that will be created now with JS code
+  -> so we replace it with {{authToken}} which will be a reference to the token that generates every time
+
+-> go to total collection -> click three dots -> click on "edit" -> go on to the Authorization tab -> select Bearer token inside the dropdown -> set the value as {{authToken}} inside the text box.
+
+status-codes
+-------------
+4. we get 201 when we create a user and 200 as when a user logs in
+
+5. in "tests" tab inside a request made on postman write the JS code
+
+snippet to be added inside "login" user request for 200 status code
+------------------------------------------------------------------
+if (pm.response.code === 200) {
+  pm.environment.set('authToken', pm.response.json().token)
+}
+
+snippet to be added inside "create" user request for 201 status code
+-------------------------------------------------------------------
+if (pm.response.code === 201) {
+  pm.environment.set('authToken', pm.response.json().token)
+}
+
+explanation:
+-------------
+1. pm (postman); on this we access status code from response object
+  -> if successful... returns "201" after create-user request and "200" after login-user
+2. check with "if condition" whether request is successful or not
+  -> if successful then use set method
+3. "set" takes in two arguments 'key-name' as 'authToken' and its value will be a "token" taken from 'pm(postman).response.json()'
+  -> 'pm(postman).response.json()' is a json() object and we access the token value from it
+
+conclusion for authToken:
+--------------------------
+1. this Script sets authentication token automatically every time we log in
+2. if the token expires... we run the login request again to get another new token >>> so this token will be automatically applies with written JS code
+3. every thing will be handled behind the scenes and no need to copy and paste the tokens anymore.
+
+quick-summary:
+--------------
+-> in this section we have learnt how to create Postman environments.
+-> environment is a key-value pair that we can access them while working in that environment.
+-> we set up authentication for every request except for login and create user requests
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+* Logging Out
+---------------
+Intro :
+-------
+1. in this we create new route to help user to log out of the application also how to remove the token after log out
+2. the main thing is here that when we logged in different devices and log out from a device and I do not want to log out of everything
+  -> we target the specific token for a device
+
+steps:
+--------
+1. inside the code for auth we have to attach the token to the requested object
+  -> req.token = token
+
+2. using try{} catch (err){} block to handle the errors
+
+3. we will use the array-filter method to remove an item from the token's array
+  -> we will update the tokens array on every check on iteration
+  -> if the token we are checking is not equal to the token used for authentication then it returns true and added into the same array
+  -> if return value is false.. then that token will be removed from that array
+
+4. at last we save the user data and that response will be sent back.
+
+ex:
+---
+router.post('/users/logout', auth, async (req, res) => {
+  try{
+    req.user.tokens = req.user.tokens.filter((token) => {
+      return token.token !== req.token
+    })
+    await req.user.save()
+    res.send()
+  }
+  catch(err){
+    res.status(500).send(err)
+  }
+})
+
+
+what if we want to logout from all devices
+-------------------------------------------
+1. use the path "/users/logoutAll"
+
+2. remove every token from the tokens array by using "req.users.tokens = []"
+  -> this will replace every thing inside "req.users.tokens" with an empty array
+
+ex:
+---
+router.post('/users/logoutAll', auth, async (req, res) => {
+  try{
+    req.user.tokens = []
+    await req.user.save()
+    res.send()
+  }
+  catch(err){
+    res.status(500).send(err)
+  }
+})
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+* Hiding Private Data
+----------------------
+Intro :
+-------
+1. how to secure the user profile data we are sending from the server
+2. the user-data fields that need be hided are... passwords and tokens
+
+steps:
+-------
+1. in user-model create a function called "getPublicProfile()" using instance methods on userSchema
+  -> use this function inside user login and get profile routes at "res.send({ user: user.getPublicProfile() })"
+
+// login route
+router.post('/users/login', async (req, res) => {
+  try {
+    const user = await User.findByCredentials(req.body.email, req.body.password);
+    const token = await user.generateAuthToken()
+
+    res.send({ user: user.getPublicProfile(), token })
+  }
+  catch(err) {
+    res.status(400).send(err)
+  }
+})
+
+2. in the function to hideout the sensitive data like passwords and tokens
+  -> we created "user" object with "toObject()" method from mongoose which returns the shallow copy of user object
+  -> on user object we deleted the passwords and tokens
+  -> returned the user-object
+
+// method to hide sensitive data
+userSchema.methods.getPublicProfile = function() {
+  const user = this;
+  const userData = user.toObject()
+
+  delete userData.password
+  delete userData.tokens
+
+  return userData
+}
+
+(OPTIONAL)
+Problem- repetitive calls for function: getPublicProfile()
+------------------------------------------------------------
+1. on each request we made we get user data that contains sensitive data that need to be hided
+  -> so on every request we have to call this method: getPublicProfile()
+  -> so instead of calling every time we simply automate the process
+    -> so take out the getPublicProfile() method and use "toJSON"
+
+// method to hide sensitive data
+userSchema.methods.toJSON = function() {
+  const user = this;
+  const userData = user.toObject()
+
+  delete userData.password
+  delete userData.tokens
+
+  return userData
+}
+
+2. change on the route at login and other requests where sending user data is needed.
+  -> at res.send({ user: user })
+
+// login route
+router.post('/users/login', async (req, res) => {
+  try {
+    const user = await User.findByCredentials(req.body.email, req.body.password);
+    const token = await user.generateAuthToken()
+
+    res.send({ user: user, token })
+  }
+  catch(err) {
+    res.status(400).send(err)
+  }
+})
+
+explanation (toJSON):
+----------------------
+1. BTS res.send({ user: user }) works like JSON.stringify()
+  -> the objects gets stringified BTS with res.send({ user: user })
+2. when the "toJSON" is used it gets called whenever an object gets stringified.
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+* authenticating User Endpoints
+-------------------------------
+Intro
+------
+1. in this we convert user routes to use authentication
+2. in the application so far we do not need fetching a user by his Id as we are doing it with user profile route
+  -> no need of "user/:id" instead we are using "user/me >>> which is a user profile route"
+
+>>> 1st: we are going to modify the delete route...
+-----------------------------------------------------
+no need of "user/:id" as path
+------------------------------
+router.get('/users/:id', async (req, res) => {
+  const _id = req.params.id;
+  try{
+    const user = await User.findById(_id)
+    if(!user){ res.status(404).send("User not found!") }
+    res.send(user)
+  }
+  catch(err){ res.status(500).send() }
+})
+
+instead we are using... "user/me" as path
+------------------------------------------
+router.get('/users/me', auth, async (req, res) => {
+  res.send( req.user.getPublicProfile() )
+})
+
+steps:
+-------
+snippet:
+---------
+// delete a user with Id >>> replace "users/:id" with "users/me"
+router.delete('/users/me', auth, async(req, res) => {
+  try{
+    const user = await User.findByIdAndDelete(req.user._id)
+    if(!user){
+      res.status(404).send()
+    }
+    res.send(req.user)
+  }
+  catch (err) {
+    res.status(500).send(err)
+  }
+})
+explanation:
+-------------
+1. integrate the auth middleware on delete-route
+  -> as we are using "auth" middleware... we have access to "user" object on request so we can fetch user-details from it... (req.user)
+2. (req.user._id) this can be used inside the route to fetch user with his id and delete him.
+3. (OPTIONAL) as we are using "auth" > a authentication middleware... so we know that user exists and there is no need to use "if" condition
+
+
+>>> 2nd: we are going to modify the update -> "PATCH" route...
+---------------------------------------------------------------
+challenge:
+-----------
+>>> refactor the update profile route
+1. update URL to users/me
+2. add authentication middleware - "auth" before the route handler "async (req, res, next) => {}"
+3. use the existing user doc instead of fetching via id from param
+4. test it using POSTMAN!
+
+before refactoring:
+------------------
+router.patch('/users/:id', async(req, res) => {
+  const reqBodyUpdates = Object.keys(req.body);
+  const updatesAllowed = ['name', 'email', 'password', 'age'];
+  const isValidOperation = reqBodyUpdates.every((reqBodyUpdate) => {
+    return updatesAllowed.includes(reqBodyUpdate)
+  })
+  if(!isValidOperation) {
+    res.status(400).send({ error: "Invalid updates!" })
+  }
+  const _id = req.params.id
+  try{
+    const user = await User.findById(_id)
+    reqBodyUpdates.forEach((update) => {
+      user[update] = req.body[update]
+    })
+    await user.save()
+    // this is commented because it is bypassing and directly updating in the database
+    // const user = await User.findByIdAndUpdate(_id, req.body, { new: true, runValidators: true })
+     if(!user){
+      res.status(404).send()
+    }
+    res.send(user)
+  }
+  catch(err){
+    res.status(400).send(err)
+  }
+})
+
+after refactoring:
+-------------------
+// updating a single user with Id >>> this is modified check the docs for the previous version of update router
+router.patch('/users/me', auth, async(req, res) => {
+  const reqBodyUpdates = Object.keys(req.body);
+  const updatesAllowed = ['name', 'email', 'password', 'age'];
+  const isValidOperation = reqBodyUpdates.every((reqBodyUpdate) => {        // *> returns true if all elements in the array satisfy the provided testing function.
+    return updatesAllowed.includes(reqBodyUpdate)
+  })
+  if(!isValidOperation) {
+    res.status(400).send({ error: "Invalid updates!" })
+  }
+  try{
+    const user = await User.findById(req.user._id)
+    reqBodyUpdates.forEach((update) => {
+      user[update] = req.body[update]
+    })
+    await user.save()
+    // this is commented because it is bypassing and directly updating in the database
+    // const user = await User.findByIdAndUpdate(_id, req.body, { new: true, runValidators: true })
+    res.send(user)
+  }
+  catch(err){
+    res.status(400).send(err)
+  }
+})
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+* The User/Task Relationship
+------------------------------
+Intro:
+------
+1. user-task relationship: after this session... we learn to code so that users can only access and manages their tasks what they have created
+2. we need only index, user-model, task-router and task-model to work for this functionality.
+3. there are two approaches to make this possible...
+  1. user can store the ID of tasks they have created.
+  2. tasks model can store the ID of the user who created the tasks
+
+-> we go with 2nd way of approach:
+steps - basic way:
+-----------------
+1. insert a new field inside Task-model >>> owner or author or belongsTo or "createdBy"
+  -> this takes "type" that is "mongoose.Schema.Types.ObjectId"
+  -> and this field is required so it as "true"
+Note:
+-> this field inside task model, the "createdBy" field is defined as a reference to the User model
+
+-> delete the old data-base and create a new user
+
+2. make some changes in task-router inside the route to create new tasks
+  2.1 import "auth" middleware inside task-route and add it into the create task route
+  2.2 in the task-route replace the line "const task = new Task(req.body)" with
+    -> "const task = new Task ({ ...req.body, createdBy: req.user._id })"
+Note:
+------
+-> this is the basic code to relate two models in a database
+-> the advanced way to do this operation is...
+
+steps - advanced way:
+----------------------
+intro - rough work:
+--------------------
+-> below operation is done inside "index" file
+-> import Task-model and fetch a task by it's id using id of the task and grab the "task-Id" field inside the task-model
+
+const Task = require('./models/task')
+const getUserFromTask = async() => {
+  const task = await Task.findById("taskId from the task that was created!")
+  clg(task.createdBy)
+}
+res:
+-----
+-> as a result we get like this "new ObjectId('66548da3f7d0ba282cb52740')"
+-> but we want only the plain id "66548da3f7d0ba282cb52740"
+
+>>> so change the code to "clg(task.createdBy.toString())"
+
+problem:
+--------
+-> as we are getting only the user id who created the task what if we want more details of the user
+(ex: what if we want user name associated with the Id we got just now)
+
+solutions:
+-----------
+1. manual process (_NOT_RECOMMENDED_):
+--------------------------------------
+-> the id we retrieved will help to fetch more user-details
+  -> we user mongoose methods like "findById()" after importing "User-model" (just like... how we did to fetch task-details)
+-> this is a long and manual process
+
+2. another way:
+----------------
+-> WITH MONGOOSE THERE IS ACTUALLY A WAY TO SET RELATIONS BETWEEN TWO MODELS...
+---------------------------------------------------------------------------------
+-> so set up another field inside the "createdBy" in the task model
+-> which is "ref" -> reference >>> this links to another model we named it as "User"
+  -> const User = mongoose.model('User', userSchema);
+                                    |
+                              user-model name
+updated task-model:
+-------------------
+createdBy: {
+  type: mongoose.Schema.Types.ObjectId,
+  required: true,
+  ref: "User"
+}
+-> this property creates relationship between two models "User" and "Task"
+
+GET USER-DETAILS USING TASK-ID FROM THE TASK WHICH WE HAVE CREATED:
+--------------------------------------------------------------------
+-> so we can easily fetch the user details from the task-model with a method that is "populate" which returns a promise and we use await on that
+  -> "await task.populate('createdBy').execPopulate()"
+    -> using this we get entire user-object-details attached with task that was created by that user
+snippet:
+--------
+const Task = require('./models/task')
+const getUserFromTask = async() => {
+  const task = await Task.findById("taskId from the task that was created!")
+  await task.populate('createdBy').execPopulate()
+  clg(task.createdBy)
+}
+ex:
+----
+const Task = require('./models/task')
+const getUserFromTask = async () => {
+  try {
+    const task = await Task.findById('66548e2e3fb959e24dba0a1d');      // task-id was provided
+    await task.populate('createdBy')
+    console.log(task.createdBy);
+  } catch (error) {
+    console.error(error);
+  }
+}
+getUserFromTask()
+
+Note:
+------
+-> till now we got user-details form task-id but now we do the reverse process
+
+GET TASK-DETAILS USING USER-ID:
+--------------------------------
+-> we use the id that we have got from the task that user created
+-> to fetch tasks we do not use "user.tasks"... as we have no tasks array like tokens array on user object
+  -> so we set up a virtual property on user-schema which is not the actual data that will be stored inside database
+    "userSchema.virtual('tasks', {
+      ref: 'Task',                            // which model we are referencing to User-model
+      localField: '',                         // where the local-data is stored and as we have "createdBy" which is an id on the task-model
+      foreignField: ''                        // name of the field... on the reference model that we are linking here
+    })"
+
+snippet:
+---------
+userSchema.virtual('tasks', {
+  ref: 'Task',
+  localField: '_id',
+  foreignField: 'createdBy'
+})
+
+-> so we use "populate" here to fetch the details exactly we use the way what we used before
+snippet:
+---------
+const User = require('./models/task')
+const getTasksFromUser = async() => {
+  const user = await User.findById('user-id that was stored inside "createdBy" field inside task-model');
+  await user.populate('tasks').execPopulate()
+  clg(user.tasks)
+}
+ex:
+----
+// to get tasks from user-id
+-----------------------------
+const User = require('./models/user')
+const getTaskFromUser = async() => {
+  const user = await User.findById('66548da3f7d0ba282cb52740')        // user-id was provided
+  await user.populate('tasks')
+  console.log(user.tasks)
+}
+getTaskFromUser()
+
+conclusion:
+------------
+-> this is quite complex and confusing topic in mongoose
+-> so in further sessions we focus on this topic more
+-> do not use execPopulate() if there was an error...
+  -> "TypeError: task.populate(...).execPopulate is not a function"
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+* Authenticating Task Endpoints
+---------------------------------
+Intro:
+------
+1. in this we learn how to refactor all the routes by adding authentication
+
+GET /task/:id
+--------------
+get task by id created by authenticated user
+---------------------------------------------
+1. authenticating task route by adding auth inside it
+2. find task by it's id:
+-> const task = await Task.findById({ _id, createdBy: req.user._id })
+  -> change the code inside task-route
+  -> Use Task.findOne({ _id, createdBy: req.user._id }) to find the task with the given _id that also has a createdBy field matching the authenticated user's ID (req.user._id).
+  -> This ensures that even if a task with the specified _id exists, it will only be returned if it was created by the authenticated user.
+
+
+GET /tasks
+----------
+get all tasks which were created by the user
+----------------------------------------------
+1. add auth to the route to get authenticated
+2. find all the tasks that were created by the user who was logged in (authenticated)
+snippet:
+--------
+-> const tasks = await Task.find({ createdBy: req.user._id })
+
+
+PATCH /task/:id
+----------------
+update a task with it's id
+---------------------------
+1. add auth
+2. find the task created by the user who is authenticated
+snippet:
+---------
+-> const task = await Task.findOne({ _id: req.params.id, createdBy: req.user._id })
+
+
+DELETE /task/:id
+-----------------
+delete a task by it's id:
+-------------------------
+1. add authentication using "auth" middleware
+2. find the task and delete... that task must be created by user who was authenticated
+snippet:
+--------
+-> const task = await Task.findOneAndDelete({ _id: req.params.id, createdBy: req.user._id })
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+* Cascade Delete Tasks
+-----------------------
+intro:
+------
+1. here, in this sections we remove the tasks when a user wants to delete their own profile.
+  -> when I delete myself from the DB automatically the tasks created by me also be deleted.
+2. there are 2 approaches...
+
+2.1 => modify the delete-user route... where we delete the user add another line to delete the tasks that were created by authenticated user
+
+// delete a user with Id >>> replace "users/:id" with "users/me"
+router.delete('/users/me', auth, async(req, res) => {
+  try{
+    const user = await User.findByIdAndDelete(req.user._id)
+
+    // delete the tasks when user deletes his profile           //---  new line  ---
+    await Task.deleteMany({ createdBy: req.user._id })          //---  new line  ---
+
+    if(!user){
+      res.status(404).send()
+    }
+    res.send(req.user)
+  }
+  catch (err) {
+    res.status(500).send(err)
+  }
+})
+
+
+2.2 => use middleware... create a new middleware inside "User-model" which deletes user tasks when user deletes himself
+New middleware:
+----------------
+// 1st- import the task model
+const Task = require('../models/task')
+
+// 2nd- delete the tasks when user deletes himself
+userSchema.pre('remove', async function (req, res, next) {
+  const user = this
+  await Task.deleteMany({ createdBy: user._id })
+  next()
+})
+
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+* section-completed
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
