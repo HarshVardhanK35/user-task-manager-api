@@ -29,7 +29,8 @@ const auth = async (req, res, next) => {
 
     // Proceed to the next middleware or route handler
     next();
-  } catch (err) {
+  }
+  catch (err) {
     // Send an error response if authentication fails
     res.status(401).send({ Error: "Please authenticate!" });
   }

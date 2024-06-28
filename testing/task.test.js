@@ -19,16 +19,14 @@ test("Should create task for user", async() => {
   .post('/tasks')
   .set('Authorization', `Bearer ${userOne.tokens[0].token}`)
   .send({
-    description: 'Testing Tasks'
+    description: 'Testing Tasks',
+    completed: true
   })
   .expect(201)
 
   // check tasks was created or not
   const task = await Task.findById(response.body._id)
   expect(task).not.toBeNull()
-
-  // check task field "completed" is assigned to "false" by default or not
-  expect(task.completed).toEqual(false)
 })
 
 // test to get all tasks created by userOne

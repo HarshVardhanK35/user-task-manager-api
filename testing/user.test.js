@@ -1,16 +1,16 @@
-const request = require('supertest');
-const User = require('../src/models/user');
+const request = require("supertest");
+const User = require("../src/models/user");
 
-const { userOneId, userOne, databaseSetup } = require('./fixtures/db')
+const { userOneId, userOne, databaseSetup } = require("./fixtures/db");
 
 // import app
-const app = require('../src/app')
+const app = require("../src/app");
 
 // before every test-request
-beforeEach(databaseSetup)
+beforeEach(databaseSetup);
 
 // test-case: to signup a user
-test('should signup a user', async () => {
+test('1- should signup a user', async () => {
   const response = await request(app).post('/users').send(
     {
       name: "dummy-user-1",
@@ -37,7 +37,7 @@ test('should signup a user', async () => {
 })
 
 // test case - login existing user
-test('should login existing user', async() => {
+test('2- should login existing user', async() => {
   const response = await request(app).post('/users/login').send(
     {
       email: userOne.email,
@@ -51,7 +51,7 @@ test('should login existing user', async() => {
 })
 
 // test case - should not login with bad credentials
-test('should not login with bad credentials', async () => {
+test('3- should not login with bad credentials', async () => {
   await request(app).post('/users/login').send(
     {
       email: userOne.email,
@@ -61,7 +61,7 @@ test('should not login with bad credentials', async () => {
 })
 
 // test authentication for user-login
-test('Should get user-profile', async () => {
+test('4- Should get user-profile', async () => {
   await request(app)
   .get('/users/me')
   .set('Authorization', `Bearer ${userOne.tokens[0].token}`)
@@ -70,7 +70,7 @@ test('Should get user-profile', async () => {
 })
 
 // test unauthenticated user
-test('should not get user who is not authorized', async () => {
+test('5- should not get user who is unauthorized', async () => {
   await request(app)
   .get('/users/me')
   .send()
@@ -78,7 +78,7 @@ test('should not get user who is not authorized', async () => {
 })
 
 // test delete an account of an authorized user
-test('should delete an account of user', async () => {
+test('6- should delete an account of user', async () => {
   await request(app)
   .delete('/users/me')
   .set('Authorization', `Bearer ${userOne.tokens[0].token}`)
@@ -90,16 +90,8 @@ test('should delete an account of user', async () => {
   expect(user).toBeNull()
 })
 
-// test delete an account of an unauthorized user
-test('Should not delete if user is unauthorized', async() => {
-  await request(app)
-  .delete('/users/me')
-  .send()
-  .expect(401)
-})
-
 // test to upload files
-test('should upload avatar', async() => {
+test('7- should upload avatar', async() => {
   await request(app)
   .post('/users/me/avatar')
   .set('Authorization', `Bearer ${userOne.tokens[0].token}`)
@@ -112,7 +104,7 @@ test('should upload avatar', async() => {
 })
 
 // test user updates
-test("should test update of user fields", async() => {
+test("8- should test update of user fields", async() => {
   await request(app)
   .patch('/users/me')
   .set('Authorization', `Bearer ${userOne.tokens[0].token}`)
@@ -129,7 +121,7 @@ test("should test update of user fields", async() => {
 })
 
 // should not pass the test for user invalid fields
-test("should not update user fields", async() => {
+test("9- should not update user fields", async() => {
   await request(app)
   .patch('/users/me')
   .set('Authorization', `Bearer ${userOne.tokens[0].token}`)
@@ -140,3 +132,77 @@ test("should not update user fields", async() => {
   )
   .expect(400)
 })
+
+// ------------------------------------------------------------------------------------------------------ My Test Cases
+
+// Should not signup with invalid name/email/password
+test("My-1 Should not sign up with invalid name/email/password", async () => {
+  // Invalid email
+  await request(app)
+    .post("/users")
+    .send({
+      name: "invalid-user",
+      email: "invalid-email",
+      password: "ValidPass123!",
+    })
+    .expect(400);
+
+  // Invalid password (too short)
+  await request(app)
+    .post("/users")
+    .send({
+      name: "invalid-user",
+      email: "valid.email@example.com",
+      password: "123",
+    })
+    .expect(400);
+
+  // Invalid name (not a string or any other validation you may have)
+  await request(app)
+    .post("/users")
+    .send({
+      name: 123456,
+      email: "valid.email@example.com",
+      password: "ValidPass123!",
+    })
+    .expect(400);
+});
+
+// Should not update user... if user is unauthenticated
+test("My-2 Should not update user if unauthenticated", async () => {
+  await request(app)
+    .patch("/users/me")
+    .send({
+      name: "user-1",
+    })
+    .expect(401);
+
+  // Verify that the user info has not changed
+  const user = await User.findById(userOneId);
+  expect(user.name).toEqual(userOne.name);
+});
+
+// Test that authorized user Should not update with invalid user-details
+test("My-3 Should not update user with invalid name/email/password", async () => {
+  await request(app)
+    .patch("/users/me")
+    .set("Authorization", `Bearer ${userOne.tokens[0].token}`)
+    .send({
+      name: 123, // Invalid name: not a string
+      email: 123, // Invalid email: not a string
+      password: 123, // Invalid password: password does not contain min 7 characters
+    })
+    .expect(400);
+
+  // Confirm that user field has not changed
+  const user = await User.findById(userOneId);
+  expect(user.name).toEqual(userOne.name); // The name Should remain unchanged
+});
+
+// test delete an account of an unauthorized user
+test("My-4 Should not delete if user is unauthorized", async () => {
+  await request(app)
+  .delete("/users/me")
+  .send()
+  .expect(401);
+});

@@ -1,5 +1,8 @@
 const express = require('express');
-const router = new express.Router()
+const router = new express.Router();
+
+// add validation library
+const { check, validationResult } = require('express-validator')
 
 // auth-middleware
 const auth = require("../middleware/auth")
@@ -8,7 +11,18 @@ const auth = require("../middleware/auth")
 const Task = require('../models/task')
 
 // create new task
-router.post('/tasks', auth, async (req, res) => {
+router.post('/tasks', auth,
+[
+  check('description').isString().withMessage("Description must be a String"),
+  check('completed').isBoolean().withMessage("Completed must be a Boolean")
+],
+async (req, res) => {
+  const errors = validationResult(req)
+
+  if(!errors.isEmpty()){
+    return res.status(400).json({ errors: errors.array() })
+  }
+
   // const task = new Task(req.body);      // before modification
   const task = new Task ({
     ...req.body,

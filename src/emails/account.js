@@ -14,7 +14,7 @@ const sendWelcomeMail = async(transporter, email, name) => {
       subject: "Thanks for signing in Task-Management Application",
       text: `Welcome to the application, ${name}. Let me know how you get along with the application.`,
     });
-    console.log('Welcome email has been sent successfully!')
+    // console.log('Welcome email has been sent successfully!')
   }
   catch(err){
     console.log(err)
